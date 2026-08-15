@@ -5,7 +5,7 @@
     <!-- 关键黑客级突破：彻底移除 Referer 防盗链，允许直连国内腾讯/新浪/东财行情专线 -->
     <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>智选量化交易终端 · 国内全网A股5000+实时直连版 (V1200.0)</title>
+    <title>智选量化交易终端 · 国内全网A股5000+实时直连版 (V1300.0)</title>
     <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue 3 (CDN) -->
@@ -95,7 +95,7 @@
                         </span>
                     </h1>
                     <p class="text-xs text-slate-400 mt-0.5">
-                        腾讯/新浪/东财专线行情 · A股5000+秒级测评 · 8套策略一键筛选 · 7×24h 实时快讯
+                        腾讯/新浪/东财专线行情 · A股5000+中文秒搜测评 · 8套策略矩阵 · 7×24h 新闻全文大屏
                     </p>
                 </div>
             </div>
@@ -105,7 +105,7 @@
                 <!-- 全局悬浮搜索入口 -->
                 <button @click="openGlobalSearchModal" 
                         class="btn-action bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 font-sans font-bold shadow-md shadow-blue-600/30">
-                    <span>🔍 搜A股5000+ (国内实时测评)</span>
+                    <span>🔍 搜A股5000+ (中文秒搜测评)</span>
                     <span class="bg-blue-800/80 text-[10px] px-1.5 py-0.2 rounded font-mono">⌘K</span>
                 </button>
 
@@ -335,7 +335,7 @@
             </div>
         </div>
 
-        <!-- ==================== TAB 2: 7×24h 分钟级实时全网快讯 (升级支持点击展开正文大屏) ==================== -->
+        <!-- ==================== TAB 2: 7×24h 分钟级实时全网快讯 (支持点击卡片弹出完整正文抽屉) ==================== -->
         <div v-if="currentTab === 'news'" class="space-y-4">
             <div class="terminal-card p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                 <div class="flex flex-wrap items-center gap-1.5">
@@ -376,7 +376,7 @@
                         <div class="text-xs text-slate-400 font-mono">{{ item.time }}</div>
                     </div>
                     
-                    <!-- 新闻导读与全文提示 -->
+                    <!-- 新闻导读 -->
                     <p class="text-xs text-slate-300 leading-relaxed line-clamp-2">{{ item.summary }}</p>
                     
                     <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800 text-xs">
@@ -392,84 +392,11 @@
                             <span class="text-slate-400 font-mono text-[11px]">
                                 催化分值: <b class="text-yellow-400 font-bold">{{ item.impact_score }}分</b>
                             </span>
-                            <span class="text-blue-400 font-semibold text-[11px] group-hover:translate-x-0.5 transition-transform">
-                                点击阅读全文 & 深度研判 ➔
-                            </span>
+                            <button @click.stop="openNewsDetailModal(item)" class="text-blue-400 font-semibold text-[11px] hover:underline flex items-center gap-0.5">
+                                <span>📖 查看全文正文 & 深度研判 ➔</span>
+                            </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ==================== 新闻正文阅读与深度研判弹窗抽屉 ==================== -->
-        <div v-if="isNewsModalOpen && activeNewsItem" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
-            <div class="modal-sheet w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl max-h-[90vh] overflow-y-auto p-6 md:p-8 space-y-5 shadow-2xl">
-                
-                <!-- 新闻弹窗头部 -->
-                <div class="flex justify-between items-start border-b border-slate-800 pb-4">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-2">
-                            <span class="px-2.5 py-0.5 rounded text-xs font-bold"
-                                  :class="activeNewsItem.source === '财联社' ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-blue-950 text-blue-400 border border-blue-800'">
-                                【{{ activeNewsItem.source }} 电报】
-                            </span>
-                            <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700">
-                                {{ activeNewsItem.category }}
-                            </span>
-                            <span class="text-xs text-slate-400 font-mono">{{ activeNewsItem.time }}</span>
-                        </div>
-                        <h2 class="text-lg md:text-xl font-bold text-white leading-snug">{{ activeNewsItem.title }}</h2>
-                    </div>
-                    <button @click="isNewsModalOpen = false" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-sm font-bold ml-3 shrink-0">
-                        ✕
-                    </button>
-                </div>
-
-                <!-- 完整正文内容 -->
-                <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 text-sm text-slate-200 leading-relaxed space-y-3 whitespace-pre-line font-sans">
-                    <p class="font-normal">{{ activeNewsItem.full_content || activeNewsItem.summary }}</p>
-                </div>
-
-                <!-- 量化 AI 产业催化与主力动向深度研判 -->
-                <div class="bg-blue-950/40 border border-blue-800/60 p-4 rounded-xl space-y-2 text-xs">
-                    <div class="flex items-center justify-between text-blue-400 font-bold">
-                        <span class="flex items-center gap-1.5">
-                            <span>💡</span>
-                            <span>量化系统 · 产业催化与资金研判</span>
-                        </span>
-                        <span class="text-yellow-400 font-mono">催化强度指数: {{ activeNewsItem.impact_score }} / 100</span>
-                    </div>
-                    <p class="text-slate-300 leading-relaxed">
-                        {{ activeNewsItem.quant_insight || '该消息构成当前主线板块的核心产业催化。根据资金监控，主力机构正在该方向加速建仓，建议重点跟踪相关龙头标的的 3:4:3 金字塔建仓与均线突破信号。' }}
-                    </p>
-                </div>
-
-                <!-- 关联标的直达卡片 -->
-                <div class="space-y-2">
-                    <h4 class="text-xs font-bold text-slate-400">🎯 本条资讯核心关联 A 股标的:</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div v-for="rel in activeNewsItem.related_stock_names" :key="rel.code" @click="openStockDetailByCode(rel.code); isNewsModalOpen = false;"
-                             class="p-3 bg-slate-950 border border-slate-800 hover:border-blue-500 rounded-xl cursor-pointer flex justify-between items-center transition-all">
-                            <div>
-                                <div class="font-bold text-white text-xs flex items-center gap-1.5">
-                                    <span>{{ rel.name }}</span>
-                                    <span class="text-slate-400 font-mono text-[11px]">{{ rel.code }}</span>
-                                </div>
-                                <div class="text-[10px] text-blue-400 mt-0.5">点击直接展开六维体检 ➔</div>
-                            </div>
-                            <span class="text-emerald-400 font-mono font-bold text-xs">查看诊断 ⚡</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 底部操作按钮 -->
-                <div class="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
-                    <button @click="copyNewsItem(activeNewsItem)" class="btn-action bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg font-semibold flex items-center gap-1">
-                        <span>📋 复制本条新闻与研判</span>
-                    </button>
-                    <button @click="isNewsModalOpen = false" class="btn-action bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-bold">
-                        完成阅读
-                    </button>
                 </div>
             </div>
         </div>
@@ -487,7 +414,7 @@
             <textarea readonly class="w-full h-80 bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-300 focus:outline-none" :value="obsidianPreviewContent"></textarea>
         </div>
 
-        <!-- ==================== 全局悬浮搜索与全网即时测评弹窗 ==================== -->
+        <!-- ==================== 全局悬浮搜索与全网即时测评弹窗 (支持古井贡酒等任意中文名称) ==================== -->
         <div v-if="isGlobalSearchModalOpen" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-start justify-center p-3 md:p-10 overflow-y-auto">
             <div class="modal-sheet w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl p-5 md:p-7 space-y-5 shadow-2xl mt-4 md:mt-10">
                 
@@ -560,7 +487,7 @@
                         </div>
                     </div>
 
-                    <!-- 测评核心指标与六维诊断 -->
+                    <!-- 测评核心指标与六维诊断 (修复雷达图渲染) -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
                         <div class="lg:col-span-5 h-64 bg-slate-900 p-2 rounded-xl border border-slate-800 flex items-center justify-center relative" id="evalRadarDom"></div>
                         <div class="lg:col-span-7 space-y-2.5 text-xs">
@@ -584,6 +511,79 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 新闻正文阅读与深度研判弹窗抽屉 (全局最高层级 z-50) ==================== -->
+        <div v-if="isNewsModalOpen && activeNewsItem" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+            <div class="modal-sheet w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl max-h-[90vh] overflow-y-auto p-6 md:p-8 space-y-5 shadow-2xl">
+                
+                <!-- 新闻弹窗头部 -->
+                <div class="flex justify-between items-start border-b border-slate-800 pb-4">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-0.5 rounded text-xs font-bold"
+                                  :class="activeNewsItem.source === '财联社' ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-blue-950 text-blue-400 border border-blue-800'">
+                                【{{ activeNewsItem.source }} 电报】
+                            </span>
+                            <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700">
+                                {{ activeNewsItem.category }}
+                            </span>
+                            <span class="text-xs text-slate-400 font-mono">{{ activeNewsItem.time }}</span>
+                        </div>
+                        <h2 class="text-lg md:text-xl font-bold text-white leading-snug">{{ activeNewsItem.title }}</h2>
+                    </div>
+                    <button @click="isNewsModalOpen = false" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-sm font-bold ml-3 shrink-0">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- 完整正文内容 -->
+                <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 text-sm text-slate-200 leading-relaxed space-y-3 whitespace-pre-line font-sans">
+                    <p class="font-normal">{{ activeNewsItem.full_content || activeNewsItem.summary }}</p>
+                </div>
+
+                <!-- 量化 AI 产业催化与主力动向深度研判 -->
+                <div class="bg-blue-950/40 border border-blue-800/60 p-4 rounded-xl space-y-2 text-xs">
+                    <div class="flex items-center justify-between text-blue-400 font-bold">
+                        <span class="flex items-center gap-1.5">
+                            <span>💡</span>
+                            <span>量化系统 · 产业催化与资金研判</span>
+                        </span>
+                        <span class="text-yellow-400 font-mono">催化强度指数: {{ activeNewsItem.impact_score }} / 100</span>
+                    </div>
+                    <p class="text-slate-300 leading-relaxed">
+                        {{ activeNewsItem.quant_insight || '该消息构成当前主线板块的核心产业催化。根据资金监控，主力机构正在该方向加速建仓，建议重点跟踪相关龙头标的的 3:4:3 金字塔建仓与均线突破信号。' }}
+                    </p>
+                </div>
+
+                <!-- 关联标的直达卡片 -->
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-400">🎯 本条资讯核心关联 A 股标的:</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div v-for="rel in activeNewsItem.related_stock_names" :key="rel.code" @click="openStockDetailByCode(rel.code); isNewsModalOpen = false;"
+                             class="p-3 bg-slate-950 border border-slate-800 hover:border-blue-500 rounded-xl cursor-pointer flex justify-between items-center transition-all">
+                            <div>
+                                <div class="font-bold text-white text-xs flex items-center gap-1.5">
+                                    <span>{{ rel.name }}</span>
+                                    <span class="text-slate-400 font-mono text-[11px]">{{ rel.code }}</span>
+                                </div>
+                                <div class="text-[10px] text-blue-400 mt-0.5">点击直接展开六维体检 ➔</div>
+                            </div>
+                            <span class="text-emerald-400 font-mono font-bold text-xs">查看诊断 ⚡</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 底部操作按钮 -->
+                <div class="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
+                    <button @click="copyNewsItem(activeNewsItem)" class="btn-action bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg font-semibold flex items-center gap-1">
+                        <span>📋 复制本条新闻与研判</span>
+                    </button>
+                    <button @click="isNewsModalOpen = false" class="btn-action bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-bold">
+                        完成阅读
+                    </button>
                 </div>
             </div>
         </div>
@@ -733,7 +733,7 @@
 
                 const toastMsg = ref('');
 
-                // 全市场核心字典数据库 (包含古井贡酒等白马核心)
+                // 全市场核心字典数据库 (覆盖白酒、军工、算力、芯片、新能源等 100+ 核心龙头)
                 const fullStockDirectory = [
                     { code: "000596.SZ", name: "古井贡酒", pinyin: "GJGJ", sector: "白酒与高端消费", pe: 21.5, roe: 24.8, profit_growth: 26.0, peg: 0.82, moat: "徽酒龙头，全国化扩张推进顺畅，古20高端放量带动吨价持续提升。", tech: "60日均线支撑回踩企稳 + 底部放量温和上行" },
                     { code: "600363.SH", name: "联创光电", pinyin: "LCGD", sector: "激光防空与高温超导磁体", pe: 26.5, roe: 15.2, profit_growth: 35.0, peg: 0.76, moat: "高温超导感应加热设备与激光防空核心供应商，技术壁垒极高。", tech: "60日低位 VCP 极窄盘整突破 + 主力大单扫盘" },
@@ -790,7 +790,7 @@
                     { code: "002594.SZ", name: "比亚迪", board: "主板", price: 89.71, change_pct: -0.77, mkt_cap: 8894.6, pe: 30.0, roe: 24.5, profit_growth: 31.0, peg: 0.97, sector: "新能源汽车与电池", stars: "⭐⭐⭐⭐", moat: "新能源汽车全球销量冠军，垂直一体化成本优势无与伦比。", tech: "前 3 日地量极窄盘整 + 早盘量比 1.88 突变启动 + 60日相对低位起涨", target_price: 103.17, stop_loss: 85.00, risk_reward: 2.86, pos_shares: 1100, tier: "Tier2_Watchlist", strategy_keys: ["A", "C", "D", "E"] },
                     { code: "601689.SH", name: "拓普集团", board: "主板", price: 49.69, change_pct: -1.21, mkt_cap: 874.1, pe: 31.0, roe: 21.5, profit_growth: 32.0, peg: 0.97, sector: "汽车平台型零部件与机器人", stars: "⭐⭐⭐⭐", moat: "新能源汽车八大系列平台型供应商，轻量化底盘与热管理技术积淀深厚。", tech: "突破 60 日低位箱体", target_price: 57.14, stop_loss: 47.08, risk_reward: 2.85, pos_shares: 2000, tier: "Tier2_Watchlist", strategy_keys: ["A", "B", "D", "E", "G"] },
                     { code: "600584.SH", name: "长电科技", board: "主板", price: 38.85, change_pct: 1.25, mkt_cap: 695.2, pe: 28.5, roe: 14.8, profit_growth: 32.0, peg: 0.89, sector: "半导体封测与集成电路", stars: "⭐⭐⭐⭐", moat: "全球前三半导体封测巨头，先进封装芯片制造与高密度系统级封装能力领跑。", tech: "60日低位 VCP 极窄盘整突破 + 主力大单扫盘", target_price: 44.68, stop_loss: 36.81, risk_reward: 2.86, pos_shares: 2500, tier: "Tier2_Watchlist", strategy_keys: ["A", "B", "C", "D", "E"] },
-                    { code: "000651.SZ", name: "格力电器", board: "主板", price: 40.24, change_pct: 0.02, mkt_cap: 2253.4, pe: 7.7, roe: 28.0, profit_growth: 14.2, peg: 0.54, sector: "白色家电与智能制造", stars: "⭐⭐⭐", moat: "空调产业链绝对霸主，渠道掌控力与现金流造血能力极强。", tech: "早盘量比 2.24 突变启动 + 60日相对低位起涨", target_price: 46.28, stop_loss: 38.12, risk_reward: 2.85, pos_shares: 2400, tier: "Tier3_Candidates", strategy_keys: ["D", "E", "F"] },
+                    { code: "000651.SZ", name: "格力电器", board: "主板", price: 40.24, change_pct: 0.02, mkt_cap: 2253.4, pe: 7.7, roe: 28.0, profit_growth: 14.2, peg: 0.54, sector: "白色家电与智能制造", stars: "⭐⭐⭐", moat: "空调产业链绝对霸主，渠道掌控力与现金流造血能力极强。", tech: "前 3 日地量极窄盘整 + 早盘量比 2.24 突变启动 + 60日相对低位起涨", target_price: 46.28, stop_loss: 38.12, risk_reward: 2.85, pos_shares: 2400, tier: "Tier3_Candidates", strategy_keys: ["D", "E", "F"] },
                     { code: "000001.SZ", name: "平安银行", board: "主板", price: 11.25, change_pct: 0.00, mkt_cap: 2185.1, pe: 5.3, roe: 10.2, profit_growth: 1.2, peg: 1.20, sector: "传统金融与零售银行", stars: "⭐⭐⭐", moat: "国内零售银行先锋，资产质量保持稳健，高股息率防御属性凸显。", tech: "前 3 日地量极窄盘整 + 60日相对低位震荡", target_price: 12.94, stop_loss: 10.66, risk_reward: 2.86, pos_shares: 8800, tier: "Tier3_Candidates", strategy_keys: ["F"] },
                     { code: "002456.SZ", name: "欧菲光", board: "主板", price: 11.80, change_pct: -4.50, mkt_cap: 385.0, pe: 85.0, roe: 2.1, profit_growth: 5.0, peg: 17.0, sector: "消费电子光学", stars: "⭐", moat: "重资产代工竞争加剧，毛利率过低。", tech: "高位爆量倒钩长上影假突破出货", target_price: 9.80, stop_loss: 12.50, risk_reward: 0.4, pos_shares: 0, tier: "Tier4_RiskBlocked", strategy_keys: ["H"] }
                 ]);
@@ -848,7 +848,7 @@
                         category: "行业催化",
                         title: "半导体封测产能利用率饱和 长电科技先进封装获大客户追加订单",
                         summary: "半导体全行业周期性回暖确立，算力芯片与智能手机换机潮推升先进封测需求，长电科技 2.5D/3D Chiplet 封装出货量创下历史新高。",
-                        full_content: "【腾讯财经专讯】根据半导体产业协会（SIA）与主要封测代工厂最新稼动率统计，全球先进封测产能利用率已全面超过 95%，呈现供不应求的结构性紧张态势。\n\n国内封测巨头长电科技在江阴及宿迁基地的高密度系统级封装（SiP）与 2.5D/3D Chiplet 生产线持续满负荷运转，主要受国际顶级手机芯片与国产 AI 算力加速芯片追加订单驱动。随着全球消费电子回暖与端侧 AI 手机、AI PC 密集发布，半导体封测产业链迎来了长达数年的周期上行红利期。",
+                        full_content: "【腾讯财经专讯】根据半导体产业协会（SIA）与主要封测代工厂最新稼动率统计，全球先进封测产能利用率已全面超过 95%，呈现供不应求的结构性紧张态态。\n\n国内封测巨头长电科技在江阴及宿迁基地的高密度系统级封装（SiP）与 2.5D/3D Chiplet 生产线持续满负荷运转，主要受国际顶级手机芯片与国产 AI 算力加速芯片追加订单驱动。随着全球消费电子回暖与端侧 AI 手机、AI PC 密集发布，半导体封测产业链迎来了长达数年的周期上行红利期。",
                         quant_insight: "💡 量化产业研判：长电科技低位蓄势充分，符合【A: 低位启动型】与【D: 筹码穿透型】双重策略共振，止损防线清晰，盈亏比达 2.86 : 1。",
                         related_stock_names: [{ name: "长电科技", code: "600584.SH" }],
                         impact_score: 95
@@ -903,7 +903,7 @@
                 // 打开新闻完整正文弹窗大屏
                 const openNewsDetailModal = (item) => {
                     triggerHaptic();
-                    activeNewsItem.value = item;
+                    activeNewsItem.value = { ...item };
                     isNewsModalOpen.value = true;
                 };
 
@@ -1179,7 +1179,7 @@
                     fetchAndEvaluateTarget(item);
                 };
 
-                // 核心：两步式全网联网搜索测评执行函数
+                // 核心：两步式全网联网搜索测评执行函数 (彻底打通中文搜索)
                 const executeUniversalSearch = () => {
                     triggerHaptic();
                     autoCompleteSuggestions.value = [];
@@ -1191,13 +1191,13 @@
 
                     showToast(`正在国内专线实时联网查询 ${q}...`);
 
-                    // 1. 先查本地加速字典
+                    // 1. 先查本地加速字典 (支持古井贡酒、贵州茅台等)
                     const localMatch = fullStockDirectory.find(s => 
                         q.includes(s.code.split('.')[0]) || 
                         q.includes(s.name) || 
-                        s.code.toUpperCase().includes(q.toUpperCase()) || 
                         s.name.includes(q) ||
-                        (s.pinyin && q.toUpperCase().includes(s.pinyin))
+                        s.code.toUpperCase().includes(q.toUpperCase()) || 
+                        (s.pinyin && q.toUpperCase().includes(s.pinyin.toUpperCase()))
                     );
 
                     if (localMatch) {
@@ -1221,25 +1221,26 @@
                         return;
                     }
 
-                    // 3. 如果是未收录的纯中文，调用新浪/腾讯在线解析代码
+                    // 3. 如果是未收录的纯中文，调用腾讯智能联想解析真实代码
                     const script = document.createElement('script');
                     script.charset = "gbk";
                     script.setAttribute("referrerpolicy", "no-referrer");
-                    script.src = `https://suggest3.sinajs.cn/suggest/type=11,12&key=${encodeURIComponent(q)}&_t=${Date.now()}`;
+                    script.src = `https://smartbox.gtimg.cn/s.php?t=all&q=${encodeURIComponent(q)}&_t=${Date.now()}`;
                     script.onload = () => {
-                        if (window.suggestdata) {
-                            const rawItems = window.suggestdata.split(';');
+                        if (window.v_hint) {
+                            const rawItems = window.v_hint.split('^');
                             if (rawItems.length > 0 && rawItems[0]) {
-                                const parts = rawItems[0].split(',');
-                                if (parts.length >= 4) {
-                                    const sName = parts[0];
+                                const parts = rawItems[0].split('~');
+                                if (parts.length >= 3) {
+                                    const secid = parts[0];
+                                    const sName = parts[1];
                                     const sCode = parts[2];
-                                    const sSecid = parts[3];
-                                    const sFull = `${sCode}.${sSecid.startsWith('sh') ? 'SH' : 'SZ'}`;
+                                    const isSh = secid.startsWith('sh');
+                                    const sFull = `${sCode}.${isSh ? 'SH' : 'SZ'}`;
                                     fetchAndEvaluateTarget({
                                         name: sName,
                                         code: sFull,
-                                        secid: sSecid,
+                                        secid: secid,
                                         sector: "A股优质主线"
                                     });
                                     if (document.body.contains(script)) document.body.removeChild(script);
@@ -1248,7 +1249,7 @@
                             }
                         }
                         if (document.body.contains(script)) document.body.removeChild(script);
-                        showToast(`未找到 ${q}，请尝试输入其6位代码！`);
+                        showToast(`未找到 ${q}，请尝试输入其 6 位数字代码！`);
                     };
                     script.onerror = () => {
                         if (document.body.contains(script)) document.body.removeChild(script);
@@ -1257,7 +1258,7 @@
                     document.body.appendChild(script);
                 };
 
-                // 拉取真实跳动行情并全维测评
+                // 拉取真实跳动行情并全维测评 (使用解构响应触发 Vue 3 重新渲染)
                 const fetchAndEvaluateTarget = (targetObj) => {
                     let secid = targetObj.secid;
                     if (!secid) {
@@ -1313,7 +1314,7 @@
                                 }
                             }
                         }
-                        evaluatedStock.value = target;
+                        evaluatedStock.value = { ...target };
                         showToast(`已成功调取 ${target.name} (${target.code}) 国内实时真实行情！`);
                         
                         nextTick(() => {
@@ -1323,7 +1324,7 @@
                         if (document.body.contains(script)) document.body.removeChild(script);
                     };
                     script.onerror = () => {
-                        evaluatedStock.value = target;
+                        evaluatedStock.value = { ...target };
                         nextTick(() => {
                             renderEvalRadar(target);
                         });
@@ -1491,7 +1492,7 @@ status: 监控中
 - **跟踪策略**：触及 \`+8%\` 提保本线，触及 \`+15%\` 开启 MA10 移动止盈
 
 ---
-*自动生成于量化系统 V1200.0 · 北京时间*`;
+*自动生成于量化系统 V1300.0 · 北京时间*`;
                 });
 
                 const copyObsidianNote = () => {
@@ -1516,10 +1517,8 @@ status: 监控中
                     setInterval(() => {
                         beijingTimeStr.value = new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
                     }, 1000);
-                    // 页面加载自动拉取一次全网实时行情和新闻
                     setTimeout(fetchLiveMarketData, 300);
                     setTimeout(fetchLiveNews, 600);
-                    // 每 45 秒自动轮询一次全网最新快讯电报
                     setInterval(fetchLiveNews, 45000);
                     quickSelectEval(quickEvalList[0]);
                     window.addEventListener('keydown', handleKeyDown);
