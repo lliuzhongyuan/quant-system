@@ -1,8 +1,5 @@
 name: 每日全市场量化扫描
 on:
-  push:
-    branches: [main]
-    paths-ignore: ['data/**']
   schedule:
     - cron: '50 0 * * 1-5'
     - cron: '20 7 * * 1-5'
@@ -27,5 +24,5 @@ jobs:
           git config user.name 'quant-bot'
           git config user.email 'quant-bot@users.noreply.github.com'
           git add data/
-          git diff --cached --quiet || git commit -m 'data: full market scan and news'
+          git diff --cached --quiet || git commit -m 'data: full market scan, news and backtest'
           git push
