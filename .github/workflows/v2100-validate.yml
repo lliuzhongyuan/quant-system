@@ -21,4 +21,4 @@ jobs:
       - name: Required files
         run: test -f index.html && test -f scripts/engine.py && test -f scripts/backtest.py && test -f scripts/market_snapshot.py && test -f scripts/run_pipeline.py && test -f .github/workflows/market-snapshot.yml && test -f .github/workflows/daily-scan.yml && test -f .github/workflows/backtest.yml
       - name: HTML sanity
-        run: grep -q 'V2200 REAL DATA' index.html && grep -q 'data/backtest.json' index.html
+        run: grep -q 'V2200 REAL DATA' index.html && grep -q "get('backtest.json')" index.html
