@@ -868,6 +868,40 @@
                 ];
 
                 const toastMsg = ref('');
+                const latencyStr = ref("0.38s");
+                const lastSyncTimeStr = ref(new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }));
+                const marketOverview = ref({
+                    regime: "🟢 市场主升期",
+                    sentiment_score: 68.5,
+                    position_rec: "50%～60%",
+                    risk_level: "中等",
+                    action_directive: "主升策略优先 · 逢低分批吸，严禁追高",
+                    main_theme: "AI 算力与 CPO 光互联",
+                    sub_theme: "特高压电网与高温超导"
+                });
+
+                // 核心：动态加载后台全量量化筛选生成的标准 JSON 数据集
+                const loadDataFromBackend = async () => {
+                    try {
+                        const [resStocks, resNews, resMarket] = await Promise.allSettled([
+                            fetch('./data/stocks.json').then(r => r.json()),
+                            fetch('./data/news.json').then(r => r.json()),
+                            fetch('./data/market_overview.json').then(r => r.json())
+                        ]);
+
+                        if (resStocks.status === 'fulfilled' && resStocks.value.stocks) {
+                            stockList.value = resStocks.value.stocks;
+                        }
+                        if (resNews.status === 'fulfilled' && resNews.value.news) {
+                            newsList.value = resNews.value.news;
+                        }
+                        if (resMarket.status === 'fulfilled' && resMarket.value) {
+                            marketOverview.value = resMarket.value;
+                        }
+                    } catch (e) {
+                        console.log('Using baseline structured data');
+                    }
+                };
 
                 const fullStockDirectory = [
                     { code: "600089.SH", name: "特变电工", pinyin: "TBDG", sector: "特高压与新能源制造", pe: 17.09, roe: 16.5, profit_growth: 25.0, peg: 0.88, moat: "国内特高压变压器与新能源电网核心霸主，全产业链技术壁垒极高，海外电网总包业务爆发。", tech: "60日均线多头向上发散 + 底部箱体放量突破" },
@@ -1042,10 +1076,11 @@
                     isNewsModalOpen.value = true;
                 };
 
-                const fetchLiveMarketData = () => {
+                                const fetchLiveMarketData = () => {
                     triggerHaptic();
                     isRefreshing.value = true;
-                    showToast("正在同步交易所真实跳动报价 (QFQ)...");
+                    const tStart = performance.now();
+                    showToast("正在连接交易所行情服务器同步全市场跳动报价 (QFQ)...");
                     
                     const secids = stockList.value.map(s => (s.code.includes('.SH') ? 'sh' : 'sz') + s.code.split('.')[0]).join(',');
                     const script = document.createElement('script');
@@ -1053,6 +1088,10 @@
                     script.setAttribute("referrerpolicy", "no-referrer");
                     script.src = `https://qt.gtimg.cn/q=${secids}&_t=${Date.now()}`;
                     script.onload = () => {
+                        const tEnd = performance.now();
+                        latencyStr.value = ((tEnd - tStart) / 1000).toFixed(2) + "s";
+                        lastSyncTimeStr.value = new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
+
                         let updatedCount = 0;
                         stockList.value.forEach(s => {
                             const prefix = s.code.includes('.SH') ? 'sh' : 'sz';
@@ -1069,6 +1108,16 @@
                                         s.target_price = Number((latestP * 1.15).toFixed(2));
                                         s.stop_loss = Number((latestP - latestP * 0.035 * 1.5).toFixed(2));
                                         s.risk_reward = Number(((s.target_price - latestP) / (latestP - s.stop_loss)).toFixed(2));
+                                        s.breakeven_price = Number((latestP * 1.0018).toFixed(2));
+                                        
+                                        // 动态重算机会分与动作
+                                        if (chgP > 3.0) {
+                                            s.action_status = "🔴 当前不追";
+                                        } else if (chgP >= 0) {
+                                            s.action_status = "🟢 当前可买";
+                                        } else {
+                                            s.action_status = "🟡 等待回踩";
+                                        }
                                         updatedCount++;
                                     }
                                 }
@@ -1076,12 +1125,13 @@
                         });
                         document.body.removeChild(script);
                         isRefreshing.value = false;
-                        showToast(`已成功同步 ${updatedCount} 只标的前复权报价！`);
+                        showToast(`已成功同步 ${updatedCount} 只标的前复权真实跳动报价 (延迟: ${latencyStr.value})！`);
                     };
                     script.onerror = () => {
                         if (document.body.contains(script)) document.body.removeChild(script);
                         isRefreshing.value = false;
-                        showToast("行情专线已同步至最新基准！");
+                        latencyStr.value = "超时";
+                        showToast("⚠️ 行情网络请求受限，已保持最新基准快照");
                     };
                     document.body.appendChild(script);
                 };
@@ -1367,11 +1417,13 @@ status: 监控中
                     }
                 };
 
-                onMounted(() => {
+                                onMounted(() => {
                     setInterval(() => {
                         beijingTimeStr.value = new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' });
                     }, 1000);
+                    loadDataFromBackend();
                     setTimeout(fetchLiveMarketData, 300);
+                    setInterval(fetchLiveMarketData, 45000); // 真正 45 秒自动轮询
                     activeDetailStock.value = stockList.value[0];
                     nextTick(() => renderInspectorChart(stockList.value[0]));
                     window.addEventListener('keydown', handleKeyDown);
@@ -1428,6 +1480,10 @@ status: 监控中
                     beijingTimeStr,
                     copyTradeOrder,
                     toastMsg,
+                    latencyStr,
+                    lastSyncTimeStr,
+                    marketOverview,
+                    loadDataFromBackend,
                     exportPreviewType,
                     obsidianPreviewContent,
                     currentExportContent,
