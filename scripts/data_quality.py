@@ -1,8 +1,8 @@
 import json, datetime as dt
 from pathlib import Path
-from data_sources import tencent_quote
+from data_sources import tencent_quote, source_probe
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'
-MIN_UNIVERSE=3500; MIN_SCANNED_RATIO=.90; MAX_FRESH_MINUTES=30
+MIN_UNIVERSE=3500; MIN_SCANNED_RATIO=.90; MAX_FRESH_MINUTES=30; MIN_SECONDARY_CHECKS=10; MIN_SECONDARY_PASS=.90
 
 def now(): return dt.datetime.now(dt.timezone.utc)
 def parse_ts(x):
@@ -12,7 +12,9 @@ def parse_ts(x):
 def validate(strict=True):
     market=json.loads((DATA/'market.json').read_text(encoding='utf8')) if (DATA/'market.json').exists() else {}
     signals=json.loads((DATA/'signals.json').read_text(encoding='utf8')) if (DATA/'signals.json').exists() else {}
-    report={'generated_at':now().isoformat(),'status':'fail','checks':{},'source_policy':{'universe_primary':'Sina Finance','realtime_secondary':'Tencent Finance','kline_fallback_chain':['Tencent Finance QFQ','Eastmoney QFQ','Sina Finance'],'rule':'no fabricated values; stale or incomplete data cannot be promoted to production'},'errors':[]}
+    report={'generated_at':now().isoformat(),'status':'fail','checks':{},'source_policy':{'universe_primary':'Sina Finance','realtime_secondary':'Tencent Finance','kline_fallback_chain':['Tencent Finance QFQ','Tencent Finance Legacy QFQ','Eastmoney QFQ','Sina Finance'],'rule':'no fabricated values; stale, incomplete or single-source-only production is blocked'},'errors':[]}
+    try: report['checks']['provider_probe']=source_probe('600519')
+    except Exception as e: report['checks']['provider_probe_error']=type(e).__name__
     universe=int(market.get('universe') or market.get('universe_count') or 0); scanned=int(market.get('scanned') or market.get('scanned_count') or 0)
     report['checks']['universe']=universe; report['checks']['scanned']=scanned
     if universe<MIN_UNIVERSE: report['errors'].append(f'universe too small: {universe} < {MIN_UNIVERSE}')
@@ -28,9 +30,10 @@ def validate(strict=True):
         try:
             q=tencent_quote(x['symbol']); p=x.get('price'); tp=q.get('price') if q else None
             if p and tp: secondary.append(abs(tp-p)/p<=.01)
-        except: pass
+        except Exception: pass
     report['checks']['secondary_checked']=len(secondary); report['checks']['secondary_pass_rate']=round(sum(secondary)/len(secondary),3) if secondary else None
-    if strict and secondary and sum(secondary)/len(secondary)<.90: report['errors'].append('secondary realtime cross-check below 90%')
+    if strict and len(secondary)<MIN_SECONDARY_CHECKS: report['errors'].append(f'secondary realtime checks insufficient: {len(secondary)} < {MIN_SECONDARY_CHECKS}')
+    elif strict and sum(secondary)/len(secondary)<MIN_SECONDARY_PASS: report['errors'].append('secondary realtime cross-check below 90%')
     report['status']='pass' if not report['errors'] else 'fail'
     (DATA/'data_quality.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
     print(json.dumps(report,ensure_ascii=False))
