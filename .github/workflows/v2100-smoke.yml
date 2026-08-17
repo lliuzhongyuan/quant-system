@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - name: Eastmoney market API smoke test
+      - name: Test production market pipeline
         run: python scripts/market_snapshot.py
-      - name: Assert real market payload
+      - name: Assert 5000+ universe path
         run: python -c "import json; d=json.load(open('data/market.json',encoding='utf-8')); print('universe=',d['count']); assert d['count']>1000"
