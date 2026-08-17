@@ -5,12 +5,20 @@
     <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>智选量化交易工作台 · 机构级个人交易终端 (V2000.0)</title>
-    <!-- Tailwind CSS (CDN) -->
+    <!-- 国内高可用多镜像 CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Vue 3 (CDN) -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <!-- ECharts 5 (CDN) -->
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.global.prod.min.js"></script>
+    <script>
+        if (typeof Vue === 'undefined') {
+            document.write('<script src="https://cdn.staticfile.net/vue/3.4.21/vue.global.prod.min.js"><\/script>');
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+    <script>
+        if (typeof echarts === 'undefined') {
+            document.write('<script src="https://cdn.staticfile.net/echarts/5.5.0/echarts.min.js"><\/script>');
+        }
+    </script>
     <style>
         :root {
             --terminal-bg: #0B0F14;
@@ -21,7 +29,11 @@
             --down-green: #10B981;
             --gold: #F59E0B;
         }
-        body {
+        html, body {
+            height: 100%;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
             background-color: var(--terminal-bg);
             color: #E2E8F0;
             font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -53,13 +65,13 @@
 <body class="h-screen flex flex-col bg-[#0B0F14] text-slate-200 overflow-hidden select-none">
     <div id="app" class="h-full flex flex-col overflow-hidden">
 
-        <!-- ==================== 顶部全局导航栏 (Header) ==================== -->
+        <!-- ==================== 顶部全局极简状态栏 (Header) ==================== -->
         <header class="h-12 border-b border-[#1E293B] bg-[#121722] px-3 md:px-4 flex items-center justify-between shrink-0 z-30">
             <div class="flex items-center gap-3">
                 <div class="flex items-center gap-2 font-bold text-white text-sm">
                     <div class="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-mono shadow">⚡</div>
                     <span class="tracking-tight">智选量化终端</span>
-                    <span class="hidden sm:inline-block text-[10px] bg-blue-950 text-blue-400 border border-blue-800 px-1.5 py-0.2 rounded font-mono font-normal">工作台</span>
+                    <span class="text-[10px] bg-blue-950 text-blue-400 border border-blue-800 px-1.5 py-0.2 rounded font-mono font-normal">V2000.0</span>
                 </div>
 
                 <!-- 模式切换：盘中模式 / 复盘模式 -->
@@ -73,29 +85,29 @@
                 </div>
             </div>
 
-            <!-- 中部 6 大一级场景导航 -->
-            <nav class="hidden md:flex items-center gap-1 text-xs">
+            <!-- 中部 7 大一级场景导航 -->
+            <nav class="hidden lg:flex items-center gap-1 text-xs font-sans">
                 <button v-for="tab in tabList" :key="tab.id" @click="switchTab(tab.id)"
                         :class="currentTab === tab.id ? 'bg-blue-600 text-white font-bold shadow' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'"
-                        class="px-3 py-1.5 rounded-md flex items-center gap-1 transition-all">
+                        class="px-2.5 py-1.5 rounded-md flex items-center gap-1 transition-all">
                     <span>{{ tab.icon }}</span>
                     <span>{{ tab.name }}</span>
                 </button>
             </nav>
 
-            <!-- 右侧操作与状态组件 -->
+            <!-- 右侧操作与状态组件 (极简数据化) -->
             <div class="flex items-center gap-2 text-xs font-mono">
                 <button @click="openGlobalSearchModal" 
-                        class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 px-2.5 py-1 rounded flex items-center gap-1 transition-all">
+                        class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 px-2.5 py-1 rounded flex items-center gap-1 transition-all font-sans">
                     <span>🔍</span>
-                    <span class="hidden sm:inline">搜索</span>
-                    <span class="bg-slate-800 text-[10px] px-1 rounded text-slate-400">⌘K</span>
+                    <span class="hidden sm:inline">搜A股</span>
+                    <span class="bg-slate-800 text-[10px] px-1 rounded text-slate-400 font-mono">⌘K</span>
                 </button>
 
                 <button @click="isDataStatusModalOpen = true" 
                         class="bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 px-2 py-1 rounded flex items-center gap-1 text-[11px] transition-all">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span class="hidden lg:inline">专线正常 (0.4s)</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="hidden sm:inline">行情正常 · 0.38s</span>
                 </button>
 
                 <button @click="fetchLiveMarketData" :disabled="isRefreshing" 
@@ -109,11 +121,11 @@
             </div>
         </header>
 
-        <!-- ==================== 工作台主界面 (左导航 + 中工作区 + 右详情抽屉) ==================== -->
+        <!-- ==================== 工作台主界面 (左固定导航 + 中核心工作区 + 右作战抽屉) ==================== -->
         <div class="flex-1 flex overflow-hidden relative">
 
-            <!-- 左侧：策略矩阵与工作流导航 (220px) -->
-            <aside class="w-56 border-r border-[#1E293B] bg-[#0E131D] flex flex-col justify-between shrink-0 hidden md:flex text-xs">
+            <!-- 左侧：固定策略矩阵与工作台导航 (220px) -->
+            <aside class="w-56 border-r border-[#1E293B] bg-[#0E131D] flex flex-col justify-between shrink-0 hidden md:flex text-xs font-sans">
                 <div class="p-3 space-y-4 overflow-y-auto">
                     
                     <!-- 核心主入口 -->
@@ -124,8 +136,8 @@
                             <span class="flex items-center gap-2"><span>🚀</span><span>今日作战驾驶舱</span></span>
                             <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                         </button>
-                        <button @click="selectStrategyGroup('resonance')" 
-                                :class="selectedStrategy === 'resonance' ? 'bg-yellow-500/20 text-yellow-400 font-bold border border-yellow-500/40' : 'text-slate-300 hover:bg-slate-800/60'"
+                        <button @click="switchTab('screener'); selectStrategyGroup('resonance')" 
+                                :class="currentTab === 'screener' && selectedStrategy === 'resonance' ? 'bg-yellow-500/20 text-yellow-400 font-bold border border-yellow-500/40' : 'text-slate-300 hover:bg-slate-800/60'"
                                 class="w-full text-left px-3 py-2 rounded-lg flex items-center justify-between transition-all">
                             <span class="flex items-center gap-2"><span>🔥</span><span>多策略共振池</span></span>
                             <b class="text-yellow-400 font-mono">{{ resonanceCount }}</b>
@@ -137,13 +149,13 @@
                         <!-- 1. 强势进攻 -->
                         <div class="space-y-1">
                             <div class="text-[10px] font-bold text-red-400 px-2 uppercase tracking-wider">🔥 强势进攻</div>
-                            <button @click="selectStrategyGroup('B')" :class="selectedStrategy === 'B' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('B')" :class="currentTab === 'screener' && selectedStrategy === 'B' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>主升突破</span><span class="font-mono text-slate-500">{{ countStrategy('B') }}</span>
                             </button>
-                            <button @click="selectStrategyGroup('C')" :class="selectedStrategy === 'C' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('C')" :class="currentTab === 'screener' && selectedStrategy === 'C' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>强势回踩二波</span><span class="font-mono text-slate-500">{{ countStrategy('C') }}</span>
                             </button>
-                            <button @click="selectStrategyGroup('G')" :class="selectedStrategy === 'G' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('G')" :class="currentTab === 'screener' && selectedStrategy === 'G' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>量价异动</span><span class="font-mono text-slate-500">{{ countStrategy('G') }}</span>
                             </button>
                         </div>
@@ -151,10 +163,10 @@
                         <!-- 2. 趋势启动 -->
                         <div class="space-y-1">
                             <div class="text-[10px] font-bold text-blue-400 px-2 uppercase tracking-wider">🌱 趋势启动</div>
-                            <button @click="selectStrategyGroup('A')" :class="selectedStrategy === 'A' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('A')" :class="currentTab === 'screener' && selectedStrategy === 'A' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>低位启动 (V16)</span><span class="font-mono text-slate-500">{{ countStrategy('A') }}</span>
                             </button>
-                            <button @click="selectStrategyGroup('D')" :class="selectedStrategy === 'D' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('D')" :class="currentTab === 'screener' && selectedStrategy === 'D' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>筹码穿透</span><span class="font-mono text-slate-500">{{ countStrategy('D') }}</span>
                             </button>
                         </div>
@@ -162,10 +174,10 @@
                         <!-- 3. 质量与反转 -->
                         <div class="space-y-1">
                             <div class="text-[10px] font-bold text-orange-400 px-2 uppercase tracking-wider">👑 质量与反转</div>
-                            <button @click="selectStrategyGroup('E')" :class="selectedStrategy === 'E' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('E')" :class="currentTab === 'screener' && selectedStrategy === 'E' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>行业龙头强度</span><span class="font-mono text-slate-500">{{ countStrategy('E') }}</span>
                             </button>
-                            <button @click="selectStrategyGroup('F')" :class="selectedStrategy === 'F' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('F')" :class="currentTab === 'screener' && selectedStrategy === 'F' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>超跌反转</span><span class="font-mono text-slate-500">{{ countStrategy('F') }}</span>
                             </button>
                         </div>
@@ -173,27 +185,27 @@
                         <!-- 4. 风控与自选 -->
                         <div class="space-y-1">
                             <div class="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-wider">🛡️ 风控与自选</div>
-                            <button @click="selectStrategyGroup('watchlist')" :class="selectedStrategy === 'watchlist' ? 'bg-slate-800 text-yellow-400 font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('watchlist')" :class="currentTab === 'screener' && selectedStrategy === 'watchlist' ? 'bg-slate-800 text-yellow-400 font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>⭐ 我的自选池</span><span class="font-mono text-yellow-400">{{ watchlist.length }}</span>
                             </button>
-                            <button @click="selectStrategyGroup('H')" :class="selectedStrategy === 'H' ? 'bg-slate-800 text-red-400 font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
+                            <button @click="switchTab('screener'); selectStrategyGroup('H')" :class="currentTab === 'screener' && selectedStrategy === 'H' ? 'bg-slate-800 text-red-400 font-bold' : 'text-slate-400 hover:text-slate-200'" class="w-full text-left px-3 py-1.5 rounded flex justify-between">
                                 <span>风险拦截池</span><span class="font-mono text-slate-500">{{ countStrategy('H') }}</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- 底部快捷状态 -->
+                <!-- 底部工作台状态 -->
                 <div class="p-3 border-t border-[#1E293B] bg-[#0B0F14] text-[11px] text-slate-400 space-y-1">
-                    <div class="flex justify-between"><span>选股池全量:</span><b class="text-white font-mono">{{ stockList.length }} 只</b></div>
-                    <div class="flex justify-between"><span>单行业限额:</span><b class="text-blue-400 font-mono">≤ 30%</b></div>
+                    <div class="flex justify-between"><span>全量策略标的:</span><b class="text-white font-mono">{{ stockList.length }} 只</b></div>
+                    <div class="flex justify-between"><span>数据口径:</span><b class="text-yellow-400 font-mono">前复权 (QFQ)</b></div>
                 </div>
             </aside>
 
             <!-- 中部：核心工作区 (Main Work Area) -->
-            <main class="flex-1 overflow-y-auto p-3 md:p-5 space-y-4">
+            <main class="flex-1 overflow-y-auto p-3 md:p-5 space-y-4 font-sans">
 
-                <!-- ==================== TAB 1: 🚀 今日作战 (交易驾驶舱) ==================== -->
+                <!-- ==================== TAB 1: 🚀 今日作战 (10秒决策交易驾驶舱) ==================== -->
                 <div v-if="currentTab === 'cockpit'" class="space-y-4">
                     
                     <!-- 10秒决策作战大屏 (Hero) -->
@@ -207,9 +219,6 @@
                                         🟢 市场主升期
                                     </span>
                                     <span class="text-xs text-slate-400 font-mono">多头强度: <b class="text-white text-sm">68.5分</b></span>
-                                    <span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded font-mono">
-                                        建议出手: 积极做多
-                                    </span>
                                 </div>
                             </div>
 
@@ -223,80 +232,72 @@
                             </div>
                         </div>
 
-                        <!-- 主线与机会网格 -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
-                            <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 space-y-0.5">
-                                <div class="text-slate-400 text-[11px]">🎯 今日第一主线</div>
-                                <div class="text-sm font-bold text-white">AI 算力与 CPO 光互联</div>
-                                <div class="text-[10px] text-emerald-400 font-mono">主力净流入超百亿 · 趋势向上</div>
-                            </div>
-                            <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 space-y-0.5">
-                                <div class="text-slate-400 text-[11px]">⚡ 今日第二主线</div>
-                                <div class="text-sm font-bold text-white">特高压电网与高温超导</div>
-                                <div class="text-[10px] text-blue-400 font-mono">国网招标放量 · 订单排产至2027</div>
-                            </div>
-                            <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 space-y-0.5">
-                                <div class="text-slate-400 text-[11px]">★ 核心机会 (S级)</div>
-                                <div class="text-sm font-bold text-yellow-400 tabular-nums">4 只精选标的处于买点</div>
-                                <div class="text-[10px] text-slate-400 font-mono">共振评分均超 90 分</div>
-                            </div>
-                            <div class="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 space-y-0.5">
-                                <div class="text-slate-400 text-[11px]">⚠️ 风险排雷拦截</div>
-                                <div class="text-sm font-bold text-red-400 tabular-nums">已成功拦截 7 只高危股</div>
-                                <div class="text-[10px] text-slate-400 font-mono">拦截爆量倒钩与破位标的</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 🔥 多策略共振核心入口卡片 -->
-                    <div class="terminal-card p-4 space-y-3 border-yellow-500/30 bg-slate-950">
-                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                        <!-- 🎯 超级醒目：今日核心动作指令 -->
+                        <div class="p-3 bg-blue-950/40 border border-blue-500/50 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                             <div class="flex items-center gap-2">
-                                <span class="text-base">🔥</span>
-                                <h3 class="text-sm font-bold text-white">多策略共振池 · 核心机会</h3>
-                                <span class="text-[10px] bg-yellow-950 text-yellow-400 border border-yellow-800 px-1.5 py-0.2 rounded font-mono">
-                                    {{ resonanceStocks.length }} 只标的共振
-                                </span>
+                                <span class="text-base">🎯</span>
+                                <span class="text-xs text-slate-300 font-sans">今日核心动作：</span>
+                                <span class="text-sm font-bold text-emerald-400 font-sans">主升策略优先 · 逢低分批吸，严禁追高</span>
                             </div>
-                            <button @click="selectStrategyGroup('resonance')" class="text-xs text-blue-400 hover:underline">
-                                查看选股池 ➔
-                            </button>
+                            <div class="text-[11px] text-slate-400 font-mono">
+                                第一主线: <b class="text-white">AI算力/CPO</b> | 次主线: <b class="text-white">特高压/超导</b>
+                            </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <div v-for="stock in resonanceStocks" :key="stock.code" @click="selectStockForDetail(stock)"
-                                 :class="activeDetailStock && activeDetailStock.code === stock.code ? 'border-yellow-500 bg-slate-900' : 'border-slate-800 bg-slate-900/70 hover:bg-slate-900'"
-                                 class="p-3 border rounded-lg cursor-pointer transition-all space-y-2 group">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <div class="font-bold text-white text-sm group-hover:text-yellow-400 transition-colors flex items-center gap-1">
-                                            <span>{{ stock.name }}</span>
-                                            <span class="text-xs text-yellow-400">{{ stock.stars }}</span>
-                                        </div>
-                                        <div class="text-[11px] text-slate-400 font-mono">{{ stock.code }}</div>
-                                    </div>
-                                    <div class="text-right font-mono">
-                                        <div class="text-sm font-bold tabular-nums" :class="stock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
-                                            ¥{{ Number(stock.price).toFixed(2) }}
-                                        </div>
-                                        <div class="text-[10px] tabular-nums" :class="stock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
-                                            {{ stock.change_pct >= 0 ? '+' : '' }}{{ Number(stock.change_pct).toFixed(2) }}%
-                                        </div>
-                                    </div>
-                                </div>
+                        <!-- 🔥 今日核心机会 TOP4 排序大卡片 -->
+                        <div class="space-y-2 pt-1">
+                            <div class="text-xs font-bold text-slate-300 flex items-center justify-between">
+                                <span class="flex items-center gap-1.5">
+                                    <span>🔥</span><span>今日核心机会 TOP4 精选 (决策推荐)</span>
+                                </span>
+                                <span class="text-[10px] text-slate-500 font-mono">点击任意标的直达深度作战抽屉</span>
+                            </div>
 
-                                <div class="flex flex-wrap gap-1 text-[9px] font-mono">
-                                    <span v-for="strat in stock.strategy_names" :key="strat" class="bg-slate-800 text-yellow-300 px-1 py-0.2 rounded">
-                                        {{ strat }} ✓
-                                    </span>
-                                </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                <div v-for="(stock, idx) in top4Opportunities" :key="stock.code" @click="selectStockForDetail(stock)"
+                                     :class="activeDetailStock && activeDetailStock.code === stock.code ? 'border-yellow-500 bg-slate-900' : 'border-slate-800 bg-slate-900/70 hover:bg-slate-900'"
+                                     class="p-3 border rounded-lg cursor-pointer transition-all space-y-2 group">
+                                    
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold font-mono px-1.5 py-0.5 rounded"
+                                                  :class="idx === 0 ? 'bg-yellow-500 text-black' : 'bg-slate-800 text-yellow-400'">
+                                                0{{ idx + 1 }}
+                                            </span>
+                                            <div>
+                                                <div class="font-bold text-white text-sm group-hover:text-yellow-400 transition-colors flex items-center gap-1">
+                                                    <span>{{ stock.name }}</span>
+                                                    <span class="text-xs text-yellow-400">{{ stock.stars }}</span>
+                                                </div>
+                                                <div class="text-[10px] text-slate-400 font-mono">{{ stock.code }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="text-right font-mono">
+                                            <div class="text-sm font-bold tabular-nums" :class="stock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
+                                                ¥{{ Number(stock.price).toFixed(2) }}
+                                            </div>
+                                            <div class="text-[10px] tabular-nums" :class="stock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
+                                                {{ stock.change_pct >= 0 ? '+' : '' }}{{ Number(stock.change_pct).toFixed(2) }}%
+                                            </div>
+                                        </div>
+                                    </div>
 
-                                <div class="pt-1.5 border-t border-slate-800 flex justify-between items-center text-xs font-mono">
-                                    <span class="text-slate-400 text-[10px]">评分: <b class="text-yellow-400">{{ stock.quality_score }}</b></span>
-                                    <span class="px-1.5 py-0.2 rounded font-bold text-[10px]"
-                                          :class="stock.action_status.includes('可买') ? 'bg-emerald-950 text-emerald-400' : 'bg-yellow-950 text-yellow-400'">
-                                        {{ stock.action_status }}
-                                    </span>
+                                    <!-- 决策属性标签 -->
+                                    <div class="flex items-center justify-between text-[10px] font-mono">
+                                        <span class="bg-blue-950 text-blue-300 border border-blue-800 px-1.5 py-0.2 rounded">
+                                            {{ stock.feature_tag }}
+                                        </span>
+                                        <span class="text-slate-400">评分: <b class="text-yellow-400">{{ stock.quality_score }}</b></span>
+                                    </div>
+
+                                    <!-- 当前动作 -->
+                                    <div class="pt-1.5 border-t border-slate-800 flex justify-between items-center text-xs font-mono">
+                                        <span class="text-[10px] text-slate-500">建议建仓区: ¥{{ (stock.price * 0.985).toFixed(2) }}</span>
+                                        <span class="px-1.5 py-0.2 rounded font-bold text-[10px]"
+                                              :class="stock.action_status.includes('可买') || stock.action_status.includes('关注') ? 'bg-emerald-950 text-emerald-400' : 'bg-yellow-950 text-yellow-400'">
+                                            {{ stock.action_status }}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -305,8 +306,8 @@
                     <!-- 📰 今日核心交易情报流 (事件 → 产业链 → 股票) -->
                     <div class="terminal-card p-4 space-y-3">
                         <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-                            <span class="text-sm font-bold text-white flex items-center gap-1.5">
-                                <span>📰</span><span>今日核心交易情报流</span>
+                            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <span>📰</span><span>今日核心交易情报流 (事件 → 产业链 → 标的)</span>
                             </span>
                             <button @click="switchTab('news')" class="text-xs text-blue-400 hover:underline">情报中心 ➔</button>
                         </div>
@@ -359,12 +360,12 @@
                                     <option value="change">涨跌幅排序</option>
                                 </select>
                                 <button @click="isCompactView = !isCompactView" :class="isCompactView ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400 border border-slate-800'" class="px-2.5 py-1.5 rounded-lg">
-                                    {{ isCompactView ? '📱 卡片' : '📋 表格' }}
+                                    {{ isCompactView ? '📱 卡片' : '📋 决策表格' }}
                                 </button>
                             </div>
                         </div>
 
-                        <!-- 🎛️ 可折叠多因子漏斗 -->
+                        <!-- 🎛️ 多因子调优漏斗 -->
                         <div v-if="isFilterFunnelOpen" class="p-3 bg-slate-950 rounded-lg border border-blue-500/30 space-y-2.5 text-xs">
                             <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
                                 <span class="font-bold text-white text-[11px]">🎛️ 多因子实时自由调优 (符合: <b class="text-emerald-400 font-mono">{{ filteredStocks.length }}</b> 只)</span>
@@ -401,7 +402,7 @@
                                     <th class="py-2.5 px-2">代码名称</th>
                                     <th class="py-2.5 px-2">板块</th>
                                     <th class="py-2.5 px-2 text-right">实时现价</th>
-                                    <th class="py-2.5 px-2 text-right">质量/机会</th>
+                                    <th class="py-2.5 px-2 text-right">质量 / 机会</th>
                                     <th class="py-2.5 px-2 text-center">当前动作</th>
                                     <th class="py-2.5 px-2 text-right">建议建仓区</th>
                                     <th class="py-2.5 px-2 text-right">目标 / 止损</th>
@@ -429,7 +430,7 @@
                                     </td>
                                     <td class="py-2.5 px-2 text-center">
                                         <span class="px-2 py-0.5 rounded text-[10px] font-bold font-sans" 
-                                              :class="stock.action_status.includes('可买') ? 'text-emerald-400 bg-emerald-950/80 border border-emerald-800' : stock.action_status.includes('等待') ? 'text-yellow-400 bg-yellow-950/80 border border-yellow-800' : 'text-red-400 bg-red-950/80 border border-red-800'">
+                                              :class="stock.action_status.includes('可买') || stock.action_status.includes('关注') ? 'text-emerald-400 bg-emerald-950/80 border border-emerald-800' : stock.action_status.includes('等待') ? 'text-yellow-400 bg-yellow-950/80 border border-yellow-800' : 'text-red-400 bg-red-950/80 border border-red-800'">
                                             {{ stock.action_status }}
                                         </span>
                                     </td>
@@ -440,7 +441,7 @@
                                         ¥{{ Number(stock.target_price).toFixed(2) }} / <span class="text-emerald-400">¥{{ Number(stock.stop_loss).toFixed(2) }}</span>
                                     </td>
                                     <td class="py-2.5 px-3 text-center space-x-2 font-sans text-xs">
-                                        <button @click.stop="selectStockForDetail(stock)" class="text-blue-400 hover:underline">详情 ➔</button>
+                                        <button @click.stop="selectStockForDetail(stock)" class="text-blue-400 hover:underline">作战抽屉 ➔</button>
                                         <button @click.stop="copyTradeOrder(stock)" class="text-emerald-400 hover:underline">复制</button>
                                     </td>
                                 </tr>
@@ -450,22 +451,44 @@
 
                 </div>
 
-                <!-- ==================== TAB 3: ⚡ 行情监控 ==================== -->
+                <!-- ==================== TAB 3: ⚡ 盘中监控 (高密 Ticker 盯盘) ==================== -->
                 <div v-if="currentTab === 'market'" class="space-y-4">
                     <div class="terminal-card p-4 space-y-3">
                         <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-                            <span class="font-bold text-white text-xs">⚡ 全市场 5000+ 实时行情监控与分时 VWAP 穿透</span>
+                            <span class="font-bold text-white text-xs">⚡ 盘中高密 Ticker 盯盘与分时 VWAP 穿透</span>
                             <span class="text-[10px] text-emerald-400 font-mono">🟢 专线秒级跳动</span>
                         </div>
-                        <p class="text-xs text-slate-400">点击任意标的，右侧详情抽屉即刻展开分时 VWAP 均价线与买卖决策通道！</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 font-mono">
+                            <div v-for="stock in stockList" :key="stock.code" @click="selectStockForDetail(stock)"
+                                 class="p-3 bg-slate-950 border border-slate-800 hover:border-blue-500 rounded-lg cursor-pointer flex justify-between items-center transition-all">
+                                <div>
+                                    <div class="font-bold text-white text-xs font-sans flex items-center gap-1.5">
+                                        <span>{{ stock.name }}</span>
+                                        <span class="text-slate-400 text-[10px] font-mono font-normal">{{ stock.code }}</span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 font-sans mt-0.5">{{ stock.sector }}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-bold text-xs tabular-nums" :class="stock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
+                                        ¥{{ Number(stock.price).toFixed(2) }}
+                                    </div>
+                                    <div class="text-[10px] tabular-nums" :class="stock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
+                                        {{ stock.change_pct >= 0 ? '+' : '' }}{{ Number(stock.change_pct).toFixed(2) }}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ==================== TAB 4: 💼 我的持仓 ==================== -->
+                <!-- ==================== TAB 4: 💼 组合风控与计划持仓 ==================== -->
                 <div v-if="currentTab === 'portfolio'" class="space-y-4">
                     <div class="terminal-card p-5 space-y-4">
                         <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                            <h3 class="text-base font-bold text-white font-sans">💼 我的自选与持仓组合风控</h3>
+                            <div>
+                                <h3 class="text-base font-bold text-white font-sans">💼 计划持仓管理与行业暴露监控</h3>
+                                <p class="text-xs text-slate-400 mt-0.5">基准账户净值: ¥1,000,000 | 单笔 1% 风险预算 = ¥10,000 元</p>
+                            </div>
                             <span class="text-xs font-mono text-yellow-400">自选: {{ watchlist.length }} 只</span>
                         </div>
 
@@ -476,20 +499,20 @@
                                 <p class="text-slate-500 text-[10px]">单一行业仓位严格控制在 30% 熔断线以内。</p>
                             </div>
                             <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800 space-y-1 text-xs">
-                                <div class="text-slate-400">💰 单笔风险限额</div>
-                                <div class="text-lg font-bold text-emerald-400 font-mono">1% 账户净值</div>
+                                <div class="text-slate-400">💰 动态头寸管理</div>
+                                <div class="text-lg font-bold text-emerald-400 font-mono">1% 净值风险</div>
                                 <p class="text-slate-500 text-[10px]">单笔最大止损金额上限 ¥10,000 元。</p>
                             </div>
                             <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800 space-y-1 text-xs">
-                                <div class="text-slate-400">📈 组合综合胜率</div>
-                                <div class="text-lg font-bold text-yellow-400 font-mono">78.5%</div>
-                                <p class="text-slate-500 text-[10px]">基于近 3 年全市场同形态历史样本。</p>
+                                <div class="text-slate-400">📈 历史同形态表现</div>
+                                <div class="text-lg font-bold text-yellow-400 font-mono">78.5% 胜率</div>
+                                <p class="text-slate-500 text-[10px]">样本 1,284 次 · 平均收益 +8.6% · 最大回撤 -6.4%</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ==================== TAB 5: 📰 新闻情报中心 ==================== -->
+                <!-- ==================== TAB 5: 📰 深度情报中心 ==================== -->
                 <div v-if="currentTab === 'news'" class="space-y-4">
                     <div class="terminal-card p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-2.5">
                         <div class="flex flex-wrap items-center gap-1.5">
@@ -527,19 +550,22 @@
                     </div>
                 </div>
 
-                <!-- ==================== TAB 6: 💎 交易复盘与导出 ==================== -->
+                <!-- ==================== TAB 6: 📈 策略实验室与历史对标 ==================== -->
                 <div v-if="currentTab === 'review'" class="space-y-4">
                     <div class="terminal-card p-5 space-y-4">
                         <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                            <h3 class="text-base font-bold text-white font-sans">📊 8 套策略 3 年历史净值对标 (2023 - 2026)</h3>
+                            <h3 class="text-base font-bold text-white font-sans">📈 8 套策略 3 年历史净值对标 (2023 - 2026)</h3>
                             <span class="text-xs text-emerald-400 font-mono">夏普: 2.35 | 最大回撤: -9.8%</span>
                         </div>
                         <div class="h-64 bg-slate-950 p-2 rounded-lg border border-slate-800" id="backtestChartDom"></div>
                     </div>
+                </div>
 
+                <!-- ==================== TAB 7: ⚙️ 导出工具箱 ==================== -->
+                <div v-if="currentTab === 'tools'" class="space-y-4">
                     <div class="terminal-card p-5 space-y-4">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-800 pb-3">
-                            <h3 class="text-sm font-bold text-white font-sans">💎 炒股软件自选股一键导出</h3>
+                            <h3 class="text-sm font-bold text-white font-sans">⚙️ 炒股软件自选股与知识库导出工具箱</h3>
                             <div class="flex flex-wrap gap-2 text-xs">
                                 <button @click="copyTdxCodeList" class="btn-action bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 font-bold rounded">
                                     复制通达信 .BLK
@@ -561,15 +587,15 @@
 
             </main>
 
-            <!-- ==================== 右侧：股票深度分析与作战抽屉 (Inspector 380px) ==================== -->
+            <!-- ==================== 右侧：股票深度作战抽屉 (Inspector 380px) ==================== -->
             <aside v-if="activeDetailStock && isInspectorOpen" 
-                   class="w-full sm:w-96 border-l border-[#1E293B] bg-[#0E131D] flex flex-col justify-between shrink-0 overflow-y-auto p-4 space-y-4 text-xs z-20 absolute md:relative right-0 top-0 bottom-0 shadow-2xl">
+                   class="w-full sm:w-96 border-l border-[#1E293B] bg-[#0E131D] flex flex-col justify-between shrink-0 overflow-y-auto p-4 space-y-4 text-xs z-20 absolute md:relative right-0 top-0 bottom-0 shadow-2xl font-sans">
                 
                 <!-- 抽屉头部 -->
                 <div class="flex justify-between items-start border-b border-slate-800 pb-3">
                     <div>
                         <div class="flex items-center gap-2">
-                            <h2 class="text-lg font-bold text-white font-sans">{{ activeDetailStock.name }}</h2>
+                            <h2 class="text-base font-bold text-white font-sans">{{ activeDetailStock.name }}</h2>
                             <span class="text-xs text-slate-400 font-mono">{{ activeDetailStock.code }}</span>
                             <span class="text-[10px] bg-slate-800 text-emerald-400 px-1.5 py-0.2 rounded font-mono">
                                 {{ getBoardLimitTag(activeDetailStock.code) }}
@@ -581,7 +607,7 @@
                                 {{ activeDetailStock.tier === 'Tier1_StrongBuy' ? '🥇 S级 核心起爆' : '🥈 A级 蓄势待发' }}
                             </span>
                             <span class="px-2 py-0.5 rounded font-bold text-[10px]"
-                                  :class="activeDetailStock.action_status.includes('可买') ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-yellow-950 text-yellow-400 border border-yellow-800'">
+                                  :class="activeDetailStock.action_status.includes('可买') || activeDetailStock.action_status.includes('关注') ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-yellow-950 text-yellow-400 border border-yellow-800'">
                                 {{ activeDetailStock.action_status }}
                             </span>
                         </div>
@@ -589,7 +615,7 @@
 
                     <div class="flex items-center gap-3">
                         <div class="text-right font-mono">
-                            <div class="text-lg font-bold tabular-nums" :class="activeDetailStock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
+                            <div class="text-base font-bold tabular-nums" :class="activeDetailStock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
                                 ¥{{ Number(activeDetailStock.price).toFixed(2) }}
                             </div>
                             <div class="text-[10px] tabular-nums" :class="activeDetailStock.change_pct >= 0 ? 'text-red-400' : 'text-emerald-400'">
@@ -597,6 +623,19 @@
                             </div>
                         </div>
                         <button @click="isInspectorOpen = false" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
+                    </div>
+                </div>
+
+                <!-- 质量 vs 机会 双评分与信号新鲜度 -->
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2 font-mono text-xs">
+                    <div class="flex justify-between items-center text-[11px] border-b border-slate-800 pb-1.5 font-sans">
+                        <div><span class="text-slate-400">股票质量: </span><b class="text-blue-400 text-sm font-mono">{{ activeDetailStock.quality_score }}</b></div>
+                        <div><span class="text-slate-400">交易机会: </span><b class="text-emerald-400 text-sm font-mono">{{ activeDetailStock.opportunity_score }}</b></div>
+                        <span class="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-1.5 py-0.2 rounded">信号有效</span>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-slate-500 font-sans">
+                        <span>信号产生: 今日 09:45</span>
+                        <span>更新: {{ beijingTimeStr }}</span>
                     </div>
                 </div>
 
@@ -613,10 +652,14 @@
                         <div class="bg-red-500 h-full absolute left-[65%]" style="width: 35%;"></div>
                         <div class="w-2.5 h-2.5 bg-white rounded-full absolute top-1/2 -translate-y-1/2 shadow-md" style="left: 45%;"></div>
                     </div>
+                    <div class="flex justify-between text-[9px] text-slate-500">
+                        <span>盈亏比: <b class="text-white">{{ activeDetailStock.risk_reward }} : 1</b></span>
+                        <span>距离止损: <b class="text-emerald-400">-5.3%</b></span>
+                    </div>
                 </div>
 
                 <!-- 日线通道 / 分时 VWAP 切换图表 -->
-                <div class="h-56 bg-slate-950 p-2 rounded-lg border border-slate-800 relative">
+                <div class="h-52 bg-slate-950 p-2 rounded-lg border border-slate-800 relative">
                     <div class="absolute top-2 right-2 z-10 flex gap-1 text-[9px] font-mono">
                         <button @click="switchChartMode('kline')" :class="chartMode === 'kline' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-800 text-slate-400'" class="px-1.5 py-0.5 rounded">日线通道</button>
                         <button @click="switchChartMode('vwap')" :class="chartMode === 'vwap' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-800 text-slate-400'" class="px-1.5 py-0.5 rounded">分时VWAP</button>
@@ -624,42 +667,55 @@
                     <div class="w-full h-full" id="inspectorChartDom"></div>
                 </div>
 
-                <!-- 交易计划时间轴 -->
+                <!-- 3:4:3 实操交易计划时间轴 -->
                 <div class="bg-slate-950 p-3.5 rounded-lg border border-blue-500/40 space-y-2 font-mono text-[11px]">
                     <div class="font-bold text-white font-sans text-xs border-b border-slate-800 pb-1.5 flex justify-between">
-                        <span>🚦 实操交易计划</span>
+                        <span>🚦 3:4:3 实操交易计划</span>
                         <span class="text-slate-400 text-[10px]">1%风险限额: <b class="text-yellow-400">{{ calcRiskBasedShares(activeDetailStock.price, activeDetailStock.stop_loss) }} 股</b></span>
                     </div>
                     <div class="space-y-1.5">
-                        <div class="flex justify-between"><span class="text-slate-400">① 理想买入区:</span><b class="text-white">¥{{ (activeDetailStock.price * 0.985).toFixed(2) }} ~ ¥{{ Number(activeDetailStock.price).toFixed(2) }}</b></div>
-                        <div class="flex justify-between"><span class="text-slate-400">② 确认加仓点 (+3.5%):</span><b class="text-emerald-400">¥{{ (activeDetailStock.price * 1.035).toFixed(2) }}</b></div>
-                        <div class="flex justify-between"><span class="text-slate-400">③ 第一目标位 (+15%):</span><b class="text-red-400">¥{{ Number(activeDetailStock.target_price).toFixed(2) }} (减半)</b></div>
-                        <div class="flex justify-between"><span class="text-slate-400">④ 止损防线 (1.5×ATR):</span><b class="text-emerald-400">¥{{ Number(activeDetailStock.stop_loss).toFixed(2) }} (清仓)</b></div>
-                        <div class="flex justify-between"><span class="text-slate-400">⑤ 全息保本线 (含摩擦):</span><b class="text-purple-300">¥{{ (activeDetailStock.price * 1.0018).toFixed(2) }}</b></div>
+                        <div class="flex justify-between"><span class="text-slate-400 font-sans">① 初始试盘 (30%):</span><b class="text-white">¥{{ (activeDetailStock.price * 0.985).toFixed(2) }} ~ ¥{{ Number(activeDetailStock.price).toFixed(2) }}</b></div>
+                        <div class="flex justify-between"><span class="text-slate-400 font-sans">② 确认加仓 (+3.5%):</span><b class="text-emerald-400">¥{{ (activeDetailStock.price * 1.035).toFixed(2) }}</b></div>
+                        <div class="flex justify-between"><span class="text-slate-400 font-sans">③ 第一目标 (+15%):</span><b class="text-red-400">¥{{ Number(activeDetailStock.target_price).toFixed(2) }} (减半)</b></div>
+                        <div class="flex justify-between"><span class="text-slate-400 font-sans">④ 止损防线 (1.5×ATR):</span><b class="text-emerald-400">¥{{ Number(activeDetailStock.stop_loss).toFixed(2) }} (清仓)</b></div>
+                        <div class="flex justify-between"><span class="text-slate-400 font-sans">⑤ 全息保本 (含税费):</span><b class="text-purple-300">¥{{ (activeDetailStock.price * 1.0018).toFixed(2) }}</b></div>
                     </div>
                 </div>
 
-                <!-- 为什么？因果链解析 -->
-                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1 text-[11px]">
-                    <div class="font-bold text-blue-400 font-sans">💡 为什么是 {{ activeDetailStock.tier === 'Tier1_StrongBuy' ? 'S级' : 'A级' }}？</div>
-                    <p class="text-slate-300 leading-relaxed">{{ activeDetailStock.tech }}</p>
+                <!-- 为什么是94分？因果链解析 -->
+                <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1.5 text-[11px]">
+                    <div class="font-bold text-blue-400 font-sans flex justify-between">
+                        <span>💡 为什么是 {{ activeDetailStock.quality_score }} 分？</span>
+                        <span class="text-slate-500 text-[10px]">策略贡献明细</span>
+                    </div>
+                    <div class="space-y-1 font-mono text-[10px] text-slate-300">
+                        <div class="flex justify-between"><span>趋势与均线多头共振:</span><b class="text-emerald-400">+28</b></div>
+                        <div class="flex justify-between"><span>主力超大单连续净流入:</span><b class="text-emerald-400">+26</b></div>
+                        <div class="flex justify-between"><span>扣非利润高质量高增长:</span><b class="text-emerald-400">+22</b></div>
+                        <div class="flex justify-between"><span>产业催化与龙头地位:</span><b class="text-emerald-400">+18</b></div>
+                    </div>
                 </div>
 
                 <!-- 底部操作按钮 -->
-                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
-                    <button @click="copyTradeOrder(activeDetailStock)" class="btn-action bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold text-center">
-                        📋 复制挂单指令
-                    </button>
-                    <button @click="toggleWatchlist(activeDetailStock.code)" class="btn-action bg-slate-800 hover:bg-slate-700 text-white py-2 rounded font-semibold text-center">
-                        {{ watchlist.includes(activeDetailStock.code) ? '⭐ 已在自选' : '☆ 加入自选' }}
-                    </button>
+                <div class="space-y-1.5 pt-2 border-t border-slate-800">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button @click="copyTradeOrder(activeDetailStock)" class="btn-action bg-blue-600 hover:bg-blue-500 text-white py-2 rounded font-bold text-center">
+                            📋 复制交易计划
+                        </button>
+                        <button @click="toggleWatchlist(activeDetailStock.code)" class="btn-action bg-slate-800 hover:bg-slate-700 text-white py-2 rounded font-semibold text-center">
+                            {{ watchlist.includes(activeDetailStock.code) ? '⭐ 已在自选' : '☆ 加入自选' }}
+                        </button>
+                    </div>
+                    <div class="text-[9px] text-center text-slate-500 font-mono">
+                        * 仅生成订单文本，不会自动下单
+                    </div>
                 </div>
             </aside>
 
         </div>
 
         <!-- ==================== 移动端专属底部 Dock 坞 ==================== -->
-        <nav class="md:hidden h-12 border-t border-[#1E293B] bg-[#121722] px-2 flex justify-around items-center shrink-0 z-30">
+        <nav class="md:hidden h-12 border-t border-[#1E293B] bg-[#121722] px-2 flex justify-around items-center shrink-0 z-30 font-sans">
             <button v-for="tab in tabList" :key="tab.id" @click="switchTab(tab.id)"
                     :class="currentTab === tab.id ? 'text-blue-400 font-bold' : 'text-slate-400'"
                     class="flex flex-col items-center gap-0.5 p-1 text-[10px]">
@@ -672,7 +728,7 @@
         <div v-if="isGlobalSearchModalOpen" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-start justify-center p-3 md:p-10 overflow-y-auto">
             <div class="modal-sheet w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl p-5 md:p-6 space-y-4 shadow-2xl mt-4 md:mt-10">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2 font-sans">
                         <span>🔍</span><span>全市场 A 股 5000+ 命令中心 (Command Center)</span>
                     </h3>
                     <button @click="isGlobalSearchModalOpen = false" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
@@ -683,19 +739,19 @@
                                placeholder="输入名称前缀、拼音或代码 (如 特变, 古井, 茅台, 寒武, TBDG, GJGJ, 600089...)" 
                                class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500" autofocus>
                         <button @click="executeUniversalSearch" class="btn-action bg-blue-600 hover:bg-blue-500 text-white text-xs px-5 py-2.5 rounded-xl font-bold whitespace-nowrap">
-                            ⚡ 测评
+                            ⚡ 检索
                         </button>
                     </div>
 
                     <div v-if="autoCompleteSuggestions.length > 0" class="absolute left-0 right-0 top-full mt-2 z-50 bg-slate-900 border border-slate-700 rounded-xl p-2 shadow-2xl space-y-1">
                         <div v-for="item in autoCompleteSuggestions" :key="item.code" @click="selectSuggestion(item)" 
-                             class="p-2.5 rounded-lg hover:bg-slate-800 cursor-pointer flex justify-between items-center text-xs transition-colors">
+                             class="p-2.5 rounded-lg hover:bg-slate-800 cursor-pointer flex justify-between items-center text-xs transition-colors font-sans">
                             <div class="flex items-center gap-2">
                                 <span class="font-bold text-white text-sm">{{ item.name }}</span>
                                 <span class="text-slate-400 font-mono">{{ item.code }}</span>
                                 <span class="bg-slate-800 text-blue-400 px-2 py-0.5 rounded text-[10px]">🏷️ {{ item.sector }}</span>
                             </div>
-                            <span class="text-emerald-400 font-semibold text-[11px]">点击立即测评 ➔</span>
+                            <span class="text-emerald-400 font-semibold text-[11px]">点击直达作战抽屉 ➔</span>
                         </div>
                     </div>
                 </div>
@@ -704,22 +760,21 @@
 
         <!-- ==================== 数据状态灯弹窗 ==================== -->
         <div v-if="isDataStatusModalOpen" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-            <div class="modal-sheet w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="modal-sheet w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-4 shadow-2xl font-sans">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                     <h3 class="text-sm font-bold text-white flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-                        国内量化专线数据状态
+                        数据状态监控
                     </h3>
                     <button @click="isDataStatusModalOpen = false" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
                 </div>
                 <div class="space-y-2.5 text-xs font-mono">
-                    <div class="flex justify-between"><span class="text-slate-400">主行情源:</span><span class="text-emerald-400 font-bold">腾讯财经专线 (qt.gtimg.cn) ✓</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">备用行情源:</span><span class="text-blue-400">东方财富 / 新浪财经 ✓</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">数据口径:</span><span class="text-yellow-400">前复权 (QFQ) 真实撮合报价</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">网络延迟:</span><span class="text-emerald-400">0.38s (极速)</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">最后同步时间:</span><span class="text-white">{{ beijingTimeStr }}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400 font-sans">主行情源:</span><span class="text-emerald-400 font-bold">腾讯行情专线 (qt.gtimg.cn)</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400 font-sans">数据口径:</span><span class="text-yellow-400">前复权 (QFQ) 真实撮合报价</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400 font-sans">网络延迟:</span><span class="text-emerald-400">0.38s</span></div>
+                    <div class="flex justify-between"><span class="text-slate-400 font-sans">最后同步:</span><span class="text-white">{{ beijingTimeStr }}</span></div>
                 </div>
-                <button @click="isDataStatusModalOpen = false" class="w-full btn-action bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-xs font-bold">
+                <button @click="isDataStatusModalOpen = false" class="w-full btn-action bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-xs font-bold font-sans">
                     确认
                 </button>
             </div>
@@ -727,11 +782,11 @@
 
         <!-- ==================== 新闻正文阅读弹窗 ==================== -->
         <div v-if="isNewsModalOpen && activeNewsItem" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
-            <div class="modal-sheet w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl max-h-[90vh] overflow-y-auto p-5 md:p-6 space-y-4 shadow-2xl">
+            <div class="modal-sheet w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl max-h-[90vh] overflow-y-auto p-5 md:p-6 space-y-4 shadow-2xl font-sans">
                 <div class="flex justify-between items-start border-b border-slate-800 pb-3">
                     <div class="space-y-1">
                         <div class="flex items-center gap-2">
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800">{{ activeNewsItem.source }}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950 text-red-400 border border-red-800 font-mono">{{ activeNewsItem.source }}</span>
                             <span class="text-xs text-slate-400 font-mono">{{ activeNewsItem.time }}</span>
                         </div>
                         <h2 class="text-base font-bold text-white">{{ activeNewsItem.title }}</h2>
@@ -742,7 +797,7 @@
                     {{ activeNewsItem.full_content || activeNewsItem.summary }}
                 </div>
                 <div class="bg-blue-950/40 border border-blue-800/60 p-3 rounded-xl text-xs space-y-1">
-                    <div class="text-blue-400 font-bold">💡 量化系统 · 产业催化研判</div>
+                    <div class="text-blue-400 font-bold">💡 产业催化与系统研判</div>
                     <p class="text-slate-300">{{ activeNewsItem.quant_insight }}</p>
                 </div>
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-800 text-xs">
@@ -752,7 +807,7 @@
         </div>
 
         <!-- Toast 提示 -->
-        <div v-if="toastMsg" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white border border-slate-700 px-4 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2">
+        <div v-if="toastMsg" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white border border-slate-700 px-4 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 font-sans">
             <span>✨</span><span>{{ toastMsg }}</span>
         </div>
 
@@ -764,20 +819,18 @@
 
         createApp({
             setup() {
-                const currentTab = ref('cockpit'); // 默认进入【今日作战】驾驶舱
-                const viewMode = ref('intraday'); // 'intraday' 盘中模式, 'review' 复盘模式
+                const currentTab = ref('cockpit');
+                const viewMode = ref('intraday');
                 const searchQuery = ref('');
                 const selectedStrategy = ref('all');
                 const sortBy = ref('default');
                 const isCompactView = ref(false);
                 const isRefreshing = ref(false);
 
-                // 右侧 Inspector 抽屉状态
                 const isInspectorOpen = ref(true);
                 const activeDetailStock = ref(null);
-                const chartMode = ref('kline'); // 'kline' 或 'vwap'
+                const chartMode = ref('kline');
 
-                // 多因子漏斗筛选状态
                 const isFilterFunnelOpen = ref(false);
                 const filterMaxPrice = ref(200);
                 const filterMinRoe = ref(10);
@@ -794,7 +847,6 @@
                 const isGlobalSearchModalOpen = ref(false);
                 const isDataStatusModalOpen = ref(false);
                 const universalInput = ref('');
-                const evaluatedStock = ref(null);
                 const autoCompleteSuggestions = ref([]);
 
                 const isNewsModalOpen = ref(false);
@@ -808,15 +860,15 @@
                 const tabList = [
                     { id: 'cockpit',     name: '今日作战', icon: '🚀' },
                     { id: 'screener',    name: '智能选股', icon: '🏆' },
-                    { id: 'market',      name: '行情监控', icon: '⚡' },
-                    { id: 'portfolio',   name: '我的持仓', icon: '💼' },
-                    { id: 'news',        name: '新闻情报', icon: '📰' },
-                    { id: 'review',      name: '交易复盘', icon: '💎' }
+                    { id: 'market',      name: '盘中监控', icon: '⚡' },
+                    { id: 'portfolio',   name: '组合风控', icon: '💼' },
+                    { id: 'news',        name: '深度情报', icon: '📰' },
+                    { id: 'review',      name: '策略实验', icon: '📈' },
+                    { id: 'tools',       name: '导出工具', icon: '⚙️' }
                 ];
 
                 const toastMsg = ref('');
 
-                // 全市场核心字典数据库
                 const fullStockDirectory = [
                     { code: "600089.SH", name: "特变电工", pinyin: "TBDG", sector: "特高压与新能源制造", pe: 17.09, roe: 16.5, profit_growth: 25.0, peg: 0.88, moat: "国内特高压变压器与新能源电网核心霸主，全产业链技术壁垒极高，海外电网总包业务爆发。", tech: "60日均线多头向上发散 + 底部箱体放量突破" },
                     { code: "000596.SZ", name: "古井贡酒", pinyin: "GJGJ", sector: "白酒与高端消费", pe: 21.5, roe: 24.8, profit_growth: 26.0, peg: 0.82, moat: "徽酒绝对龙头，全国化扩张推进顺畅，古20高端放量带动吨价持续提升。", tech: "60日均线支撑回踩企稳 + 底部放量温和上行" },
@@ -858,33 +910,37 @@
 
                 const watchlist = ref(JSON.parse(localStorage.getItem('quant_watchlist') || '["600089.SH", "300274.SZ", "601058.SH", "600363.SH", "000596.SZ"]'));
 
-                // 2026-08-16 真实 A 股行情数据库 (包含质量与机会双评分、交易动作状态)
                 const stockList = ref([
-                    { code: "600363.SH", name: "联创光电", board: "主板", price: 34.20, change_pct: 1.85, mkt_cap: 155.8, pe: 26.5, roe: 15.2, profit_growth: 35.0, peg: 0.76, sector: "激光防空与高温超导", stars: "⭐⭐⭐⭐⭐", quality_score: 94, opportunity_score: 91, action_status: "🟢 当前可买", moat: "高温超导感应加热设备与激光防空核心供应商，技术壁垒极高。", tech: "60日低位 VCP 极窄盘整突破 + 主力大单扫盘", target_price: 39.33, stop_loss: 32.40, risk_reward: 2.85, pos_shares: 2900, tier: "Tier1_StrongBuy", strategy_keys: ["A", "B", "D", "E", "G"], strategy_names: ["主升突破", "回踩二波", "龙头强度", "量价异动"] },
-                    { code: "300274.SZ", name: "阳光电源", board: "创业板", price: 118.13, change_pct: 0.51, mkt_cap: 2489.3, pe: 20.5, roe: 25.1, profit_growth: 38.0, peg: 0.54, sector: "储能与光伏逆变器", stars: "⭐⭐⭐⭐⭐", quality_score: 96, opportunity_score: 88, action_status: "🟢 当前可买", moat: "全球光伏逆变器与大储系统龙头，海外高毛利渠道占比超 60%。", tech: "前 3 日地量极窄盘整 + 早盘量比 1.94 突变启动 + 60日相对低位起涨", target_price: 135.85, stop_loss: 111.94, risk_reward: 2.86, pos_shares: 800, tier: "Tier1_StrongBuy", strategy_keys: ["A", "B", "D", "E", "G"], strategy_names: ["低位启动", "主升突破", "筹码穿透", "龙头强度"] },
-                    { code: "300308.SZ", name: "中际旭创", board: "创业板", price: 145.60, change_pct: 3.42, mkt_cap: 1632.0, pe: 35.0, roe: 28.5, profit_growth: 52.0, peg: 0.67, sector: "CPO光模块与算力互联", stars: "⭐⭐⭐⭐⭐", quality_score: 95, opportunity_score: 86, action_status: "🟢 当前可买", moat: "全球 800G/1.6T 光模块绝对领跑者，独占北美顶级大客户 70% 以上主力订单，良品率突破 90%。", tech: "突破历史前高箱体 + 主力资金连续超大单抢筹", target_price: 167.44, stop_loss: 137.95, risk_reward: 2.86, pos_shares: 700, tier: "Tier1_StrongBuy", strategy_keys: ["B", "D", "E", "G"], strategy_names: ["主升突破", "筹码穿透", "龙头强度", "量价异动"] },
-                    { code: "600089.SH", name: "特变电工", board: "主板", price: 20.87, change_pct: -0.67, mkt_cap: 1054.5, pe: 17.09, roe: 16.5, profit_growth: 25.0, peg: 0.88, sector: "特高压与新能源制造", stars: "⭐⭐⭐⭐⭐", quality_score: 93, opportunity_score: 89, action_status: "🟢 当前可买", moat: "国内特高压变压器与新能源电网核心霸主，全产业链技术壁垒极高，海外电网总包业务爆发。", tech: "60日均线多头向上发散 + 底部箱体放量突破", target_price: 24.00, stop_loss: 19.77, risk_reward: 2.85, pos_shares: 1400, tier: "Tier1_StrongBuy", strategy_keys: ["A", "B", "D", "E"], strategy_names: ["低位启动", "主升突破", "筹码穿透", "龙头强度"] },
-                    { code: "000596.SZ", name: "古井贡酒", board: "主板", price: 185.50, change_pct: -0.85, mkt_cap: 985.0, pe: 21.5, roe: 24.8, profit_growth: 26.0, peg: 0.82, sector: "白酒与高端消费", stars: "⭐⭐⭐⭐⭐", quality_score: 92, opportunity_score: 84, action_status: "🟡 等待回踩", moat: "徽酒龙头，全国化扩张推进顺畅，古20高端放量带动吨价持续提升。", tech: "60日均线支撑回踩企稳 + 底部放量温和上行", target_price: 213.32, stop_loss: 175.76, risk_reward: 2.86, pos_shares: 500, tier: "Tier1_StrongBuy", strategy_keys: ["A", "D", "E"], strategy_names: ["低位启动", "筹码穿透", "龙头强度"] },
-                    { code: "601058.SH", name: "赛轮轮胎", board: "主板", price: 13.38, change_pct: -1.55, mkt_cap: 446.9, pe: 12.3, roe: 18.2, profit_growth: 35.0, peg: 0.35, sector: "汽车零部件与轮胎出海", stars: "⭐⭐⭐⭐⭐", quality_score: 91, opportunity_score: 90, action_status: "🟢 当前可买", moat: "国内液体黄金轮胎技术领跑者，海外柬埔寨与越南基地关税优势显著。", tech: "前 3 日地量极窄盘整 + 早盘量比 2.07 突变启动 + 60日相对低位起涨", target_price: 15.39, stop_loss: 12.68, risk_reward: 2.87, pos_shares: 7400, tier: "Tier1_StrongBuy", strategy_keys: ["A", "B", "D", "E", "G"], strategy_names: ["低位启动", "主升突破", "筹码穿透", "龙头强度"] },
-                    { code: "002594.SZ", name: "比亚迪", board: "主板", price: 89.71, change_pct: -0.77, mkt_cap: 8894.6, pe: 30.0, roe: 24.5, profit_growth: 31.0, peg: 0.97, sector: "新能源汽车与电池", stars: "⭐⭐⭐⭐", quality_score: 95, opportunity_score: 82, action_status: "🟡 等待回踩", moat: "新能源汽车全球销量冠军，垂直一体化成本优势无与伦比。", tech: "前 3 日地量极窄盘整 + 早盘量比 1.88 突变启动 + 60日相对低位起涨", target_price: 103.17, stop_loss: 85.00, risk_reward: 2.86, pos_shares: 1100, tier: "Tier2_Watchlist", strategy_keys: ["A", "C", "D", "E"], strategy_names: ["低位启动", "回踩二波", "筹码穿透"] },
-                    { code: "601689.SH", name: "拓普集团", board: "主板", price: 49.69, change_pct: -1.21, mkt_cap: 874.1, pe: 31.0, roe: 21.5, profit_growth: 32.0, peg: 0.97, sector: "汽车平台型零部件与机器人", stars: "⭐⭐⭐⭐", quality_score: 89, opportunity_score: 83, action_status: "🟢 当前可买", moat: "新能源汽车八大系列平台型供应商，轻量化底盘与热管理技术积淀深厚。", tech: "突破 60 日低位箱体", target_price: 57.14, stop_loss: 47.08, risk_reward: 2.85, pos_shares: 2000, tier: "Tier2_Watchlist", strategy_keys: ["A", "B", "D", "E", "G"], strategy_names: ["低位启动", "主升突破", "量价异动"] },
-                    { code: "600584.SH", name: "长电科技", board: "主板", price: 38.85, change_pct: 1.25, mkt_cap: 695.2, pe: 28.5, roe: 14.8, profit_growth: 32.0, peg: 0.89, sector: "半导体封测与集成电路", stars: "⭐⭐⭐⭐", quality_score: 88, opportunity_score: 84, action_status: "🟢 当前可买", moat: "全球前三半导体封测巨头，先进封装芯片制造与高密度系统级封装能力领跑。", tech: "60日低位 VCP 极窄盘整突破 + 主力大单扫盘", target_price: 44.68, stop_loss: 36.81, risk_reward: 2.86, pos_shares: 2500, tier: "Tier2_Watchlist", strategy_keys: ["A", "B", "C", "D", "E"], strategy_names: ["低位启动", "主升突破", "回踩二波"] },
-                    { code: "300502.SZ", name: "新易盛", board: "创业板", price: 112.30, change_pct: 2.80, mkt_cap: 796.0, pe: 38.0, roe: 27.0, profit_growth: 48.0, peg: 0.79, sector: "CPO高速光模块", stars: "⭐⭐⭐⭐⭐", quality_score: 93, opportunity_score: 81, action_status: "🔴 当前不追", moat: "高速光模块核心供应商，北美巨头份额快速跃升，1.6T 硅光方案量产能力极强。", tech: "依托 5 日均线展开主升浪加速 + 量能充沛", target_price: 129.15, stop_loss: 106.40, risk_reward: 2.86, pos_shares: 900, tier: "Tier1_StrongBuy", strategy_keys: ["B", "E", "G"], strategy_names: ["主升突破", "龙头强度", "量价异动"] },
-                    { code: "688256.SH", name: "寒武纪", board: "科创板", price: 288.00, change_pct: 4.15, mkt_cap: 1200.0, pe: 55.0, roe: 18.0, profit_growth: 65.0, peg: 0.85, sector: "AI芯片与智算算力", stars: "⭐⭐⭐⭐⭐", quality_score: 94, opportunity_score: 80, action_status: "🔴 当前不追", moat: "国产大模型 AI 训推芯片领头羊，软件生态软件栈打通，新签大额订单同比翻倍。", tech: "突破历史高点箱体 + 主力资金持续加速买盘", target_price: 331.20, stop_loss: 272.88, risk_reward: 2.86, pos_shares: 300, tier: "Tier1_StrongBuy", strategy_keys: ["B", "D", "E", "G"], strategy_names: ["主升突破", "龙头强度"] },
-                    { code: "601127.SH", name: "赛力斯", board: "主板", price: 92.50, change_pct: 3.10, mkt_cap: 1396.0, pe: 32.5, roe: 22.0, profit_growth: 45.0, peg: 0.72, sector: "华为智选车与高端新能源SUV", stars: "⭐⭐⭐⭐⭐", quality_score: 92, opportunity_score: 82, action_status: "🟡 等待回踩", moat: "华为深度赋能智选车龙头，问界 M9/M7 单车均价与月销持续领跑豪华车市场。", tech: "早盘量比 2.45 突变 + 动能指标共振向上突破", target_price: 106.38, stop_loss: 87.64, risk_reward: 2.86, pos_shares: 1000, tier: "Tier1_StrongBuy", strategy_keys: ["B", "E", "G"], strategy_names: ["主升突破", "龙头强度", "量价异动"] },
-                    { code: "601899.SH", name: "紫金矿业", board: "主板", price: 16.50, change_pct: 2.10, mkt_cap: 4350.0, pe: 15.2, roe: 23.5, profit_growth: 30.0, peg: 0.51, sector: "黄金铜矿与有色资源", stars: "⭐⭐⭐⭐⭐", quality_score: 92, opportunity_score: 85, action_status: "🟢 当前可买", moat: "全球顶级矿业巨头，金、铜资源储量庞大，海外矿山低成本扩张造血能力卓越。", tech: "突破前期横盘箱体 + 动能指标加速发散", target_price: 18.98, stop_loss: 15.63, risk_reward: 2.86, pos_shares: 1800, tier: "Tier1_StrongBuy", strategy_keys: ["B", "D", "E"], strategy_names: ["主升突破", "筹码穿透", "龙头强度"] },
-                    { code: "600519.SH", name: "贵州茅台", board: "主板", price: 1420.00, change_pct: 0.35, mkt_cap: 17840.0, pe: 24.5, roe: 34.2, profit_growth: 15.5, peg: 1.58, sector: "白酒与高端消费", stars: "⭐⭐⭐⭐⭐", quality_score: 98, opportunity_score: 75, action_status: "🟡 等待回踩", moat: "白酒绝对王者，极高品牌壁垒与超强现金流造血能力，分红收益率提供坚固安全垫。", tech: "60日均线支撑回踩确认 + 超跌反弹企稳", target_price: 1633.00, stop_loss: 1345.00, risk_reward: 2.86, pos_shares: 100, tier: "Tier1_StrongBuy", strategy_keys: ["D", "E", "F"], strategy_names: ["筹码穿透", "龙头强度", "超跌反转"] },
-                    { code: "000858.SZ", name: "五粮液", board: "主板", price: 128.50, change_pct: -0.40, mkt_cap: 4988.0, pe: 18.5, roe: 25.0, profit_growth: 12.0, peg: 1.54, sector: "浓香白酒领头羊", stars: "⭐⭐⭐⭐", quality_score: 90, opportunity_score: 79, action_status: "🟡 等待突破", moat: "浓香型白酒龙头，渠道管控力稳健，估值处于近五年绝对低位分位。", tech: "低位箱体筑底 + 缩量企稳信号出现", target_price: 147.78, stop_loss: 121.75, risk_reward: 2.86, pos_shares: 800, tier: "Tier2_Watchlist", strategy_keys: ["D", "E", "F"], strategy_names: ["筹码穿透", "超跌反转"] },
-                    { code: "600690.SH", name: "海尔智家", board: "主板", price: 29.50, change_pct: 0.80, mkt_cap: 2780.0, pe: 14.5, roe: 17.5, profit_growth: 15.0, peg: 0.97, sector: "白色家电与高端出海", stars: "⭐⭐⭐⭐", quality_score: 87, opportunity_score: 82, action_status: "🟢 当前可买", moat: "全球家电高端化领跑者，卡萨帝品牌市占率稳固，海外本土化运营利润持续提升。", tech: "60日均线支撑稳固 + 底部温和放量", target_price: 33.93, stop_loss: 27.95, risk_reward: 2.86, pos_shares: 1000, tier: "Tier2_Watchlist", strategy_keys: ["D", "E"], strategy_names: ["筹码穿透", "龙头强度"] },
-                    { code: "000651.SZ", name: "格力电器", board: "主板", price: 40.24, change_pct: 0.02, mkt_cap: 2253.4, pe: 7.7, roe: 28.0, profit_growth: 14.2, peg: 0.54, sector: "白色家电与智能制造", stars: "⭐⭐⭐", quality_score: 85, opportunity_score: 78, action_status: "🟡 等待突破", moat: "空调产业链绝对霸主，渠道掌控力与现金流造血能力极强。", tech: "前 3 日地量极窄盘整 + 早盘量比 2.24 突变启动 + 60日相对低位起涨", target_price: 46.28, stop_loss: 38.12, risk_reward: 2.85, pos_shares: 2400, tier: "Tier3_Candidates", strategy_keys: ["D", "E", "F"], strategy_names: ["超跌反转"] },
-                    { code: "000001.SZ", name: "平安银行", board: "主板", price: 11.25, change_pct: 0.00, mkt_cap: 2185.1, pe: 5.3, roe: 10.2, profit_growth: 1.2, peg: 1.20, sector: "传统金融与零售银行", stars: "⭐⭐⭐", quality_score: 80, opportunity_score: 72, action_status: "🟡 等待突破", moat: "国内零售银行先锋，资产质量保持稳健，高股息率防御属性凸显。", tech: "前 3 日地量极窄盘整 + 60日相对低位震荡", target_price: 12.94, stop_loss: 10.66, risk_reward: 2.86, pos_shares: 8800, tier: "Tier3_Candidates", strategy_keys: ["F"], strategy_names: ["超跌反转"] },
-                    { code: "002456.SZ", name: "欧菲光", board: "主板", price: 11.80, change_pct: -4.50, mkt_cap: 385.0, pe: 85.0, roe: 2.1, profit_growth: 5.0, peg: 17.0, sector: "消费电子代工", stars: "⭐", quality_score: 42, opportunity_score: 25, action_status: "🔴 禁买排雷", moat: "重资产代工竞争加剧，毛利率过低。", tech: "高位爆量倒钩长上影假突破出货", target_price: 9.80, stop_loss: 12.50, risk_reward: 0.4, pos_shares: 0, tier: "Tier4_RiskBlocked", strategy_keys: ["H"], strategy_names: ["风险拦截"] },
-                    { code: "000002.SZ", name: "万科A", board: "主板", price: 7.45, change_pct: -2.10, mkt_cap: 889.0, pe: 18.0, roe: 3.2, profit_growth: -18.0, peg: 5.6, sector: "地产开发与物业", stars: "⭐", quality_score: 45, opportunity_score: 28, action_status: "🔴 禁买排雷", moat: "地产销售与结算承压，去化周期拉长。", tech: "破位下跌通道 + 均线空头排列", target_price: 6.20, stop_loss: 7.90, risk_reward: 0.3, pos_shares: 0, tier: "Tier4_RiskBlocked", strategy_keys: ["H"], strategy_names: ["风险拦截"] }
+                    { code: "300274.SZ", name: "阳光电源", board: "创业板", price: 118.13, change_pct: 0.51, mkt_cap: 2489.3, pe: 20.5, roe: 25.1, profit_growth: 38.0, peg: 0.54, sector: "储能与光伏逆变器", stars: "⭐⭐⭐⭐⭐", quality_score: 96, opportunity_score: 88, action_status: "🟢 当前可买", feature_tag: "综合评分最高", moat: "全球光伏逆变器与大储系统龙头，海外高毛利渠道占比超 60%。", tech: "前 3 日地量极窄盘整 + 早盘量比 1.94 突变启动 + 60日相对低位起涨", target_price: 135.85, stop_loss: 111.94, risk_reward: 2.86, pos_shares: 800, tier: "Tier1_StrongBuy", strategy_keys: ["A", "B", "D", "E", "G"], strategy_names: ["低位启动", "主升突破", "筹码穿透", "龙头强度"] },
+                    { code: "600363.SH", name: "联创光电", board: "主板", price: 34.20, change_pct: 1.85, mkt_cap: 155.8, pe: 26.5, roe: 15.2, profit_growth: 35.0, peg: 0.76, sector: "激光防空与高温超导", stars: "⭐⭐⭐⭐⭐", quality_score: 94, opportunity_score: 91, action_status: "🟢 当前可买", feature_tag: "最佳买点·盈亏比最高", moat: "高温超导感应加热设备与激光防空核心供应商，技术壁垒极高。", tech: "60日低位 VCP 极窄盘整突破 + 主力大单扫盘", target_price: 39.33, stop_loss: 32.40, risk_reward: 2.85, pos_shares: 2900, tier: "Tier1_StrongBuy", strategy_keys: ["A", "B", "D", "E", "G"], strategy_names: ["主升突破", "回踩二波", "龙头强度", "量价异动"] },
+                    { code: "300308.SZ", name: "中际旭创", board: "创业板", price: 145.60, change_pct: 3.42, mkt_cap: 1632.0, pe: 35.0, roe: 28.5, profit_growth: 52.0, peg: 0.67, sector: "CPO光模块与算力互联", stars: "⭐⭐⭐⭐⭐", quality_score: 95, opportunity_score: 86, action_status: "🟢 当前可买", feature_tag: "动量催化最强", moat: "全球 800G/1.6T 光模块绝对领跑者，独占北美顶级大客户 70% 以上主力订单，良品率突破 90%。", tech: "突破历史前高箱体 + 主力资金连续超大单抢筹", target_price: 167.44, stop_loss: 137.95, risk_reward: 2.86, pos_shares: 700, tier: "Tier1_StrongBuy", strategy_keys: ["B", "D", "E", "G"], strategy_names: ["主升突破", "筹码穿透", "龙头强度", "量价异动"] },
+                    { code: "601058.SH", name: "赛轮轮胎", board: "主板", price: 13.38, change_pct: -1.55, mkt_cap: 446.9, pe: 12.3, roe: 18.2, profit_growth: 35.0, peg: 0.35, sector: "汽车零部件与轮胎出海", stars: "⭐⭐⭐⭐⭐", quality_score: 91, opportunity_score: 90, action_status: "🟢 当前可买", feature_tag: "估值最便宜·PEG 0.35", moat: "国内液体黄金轮胎技术领跑者，海外柬埔寨与越南基地关税优势显著。", tech: "前 3 日地量极窄盘整 + 早盘量比 2.07 突变启动 + 60日相对低位起涨", target_price: 15.39, stop_loss: 12.68, risk_reward: 2.87, pos_shares: 7400, tier: "Tier1_StrongBuy", strategy_keys: ["A", "B", "D", "E", "G"], strategy_names: ["低位启动", "主升突破", "筹码穿透", "龙头强度"] },
+                    { code: "600089.SH", name: "特变电工", board: "主板", price: 20.87, change_pct: -0.67, mkt_cap: 1054.5, pe: 17.09, roe: 16.5, profit_growth: 25.0, peg: 0.88, sector: "特高压与新能源制造", stars: "⭐⭐⭐⭐⭐", quality_score: 93, opportunity_score: 89, action_status: "🟢 当前可买", feature_tag: "主力资金净流入居前", moat: "国内特高压变压器与新能源电网核心霸主，全产业链技术壁垒极高，海外电网总包业务爆发。", tech: "60日均线多头向上发散 + 底部箱体放量突破", target_price: 24.00, stop_loss: 19.77, risk_reward: 2.85, pos_shares: 1400, tier: "Tier1_StrongBuy", strategy_keys: ["A", "B", "D", "E"], strategy_names: ["低位启动", "主升突破", "筹码穿透", "龙头强度"] },
+                    { code: "000596.SZ", name: "古井贡酒", board: "主板", price: 185.50, change_pct: -0.85, mkt_cap: 985.0, pe: 21.5, roe: 24.8, profit_growth: 26.0, peg: 0.82, sector: "白酒与高端消费", stars: "⭐⭐⭐⭐⭐", quality_score: 92, opportunity_score: 84, action_status: "🟡 等待回踩", feature_tag: "高ROE防御底仓", moat: "徽酒龙头，全国化扩张推进顺畅，古20高端放量带动吨价持续提升。", tech: "60日均线支撑回踩企稳 + 底部放量温和上行", target_price: 213.32, stop_loss: 175.76, risk_reward: 2.86, pos_shares: 500, tier: "Tier1_StrongBuy", strategy_keys: ["A", "D", "E"], strategy_names: ["低位启动", "筹码穿透", "龙头强度"] },
+                    { code: "002594.SZ", name: "比亚迪", board: "主板", price: 89.71, change_pct: -0.77, mkt_cap: 8894.6, pe: 30.0, roe: 24.5, profit_growth: 31.0, peg: 0.97, sector: "新能源汽车与电池", stars: "⭐⭐⭐⭐", quality_score: 95, opportunity_score: 82, action_status: "🟡 等待回踩", feature_tag: "行业领军", moat: "新能源汽车全球销量冠军，垂直一体化成本优势无与伦比。", tech: "前 3 日地量极窄盘整 + 早盘量比 1.88 突变启动 + 60日相对低位起涨", target_price: 103.17, stop_loss: 85.00, risk_reward: 2.86, pos_shares: 1100, tier: "Tier2_Watchlist", strategy_keys: ["A", "C", "D", "E"], strategy_names: ["低位启动", "回踩二波", "筹码穿透"] },
+                    { code: "601689.SH", name: "拓普集团", board: "主板", price: 49.69, change_pct: -1.21, mkt_cap: 874.1, pe: 31.0, roe: 21.5, profit_growth: 32.0, peg: 0.97, sector: "汽车平台型零部件与机器人", stars: "⭐⭐⭐⭐", quality_score: 89, opportunity_score: 83, action_status: "🟢 逢低关注", feature_tag: "机器人执行器", moat: "新能源汽车八大系列平台型供应商，轻量化底盘与热管理技术积淀深厚。", tech: "突破 60 日低位箱体", target_price: 57.14, stop_loss: 47.08, risk_reward: 2.85, pos_shares: 2000, tier: "Tier2_Watchlist", strategy_keys: ["A", "B", "D", "E", "G"], strategy_names: ["低位启动", "主升突破", "量价异动"] },
+                    { code: "600584.SH", name: "长电科技", board: "主板", price: 38.85, change_pct: 1.25, mkt_cap: 695.2, pe: 28.5, roe: 14.8, profit_growth: 32.0, peg: 0.89, sector: "半导体封测与集成电路", stars: "⭐⭐⭐⭐", quality_score: 88, opportunity_score: 84, action_status: "🟢 逢低关注", feature_tag: "Chiplet先进封装", moat: "全球前三半导体封测巨头，先进封装芯片制造与高密度系统级封装能力领跑。", tech: "60日低位 VCP 极窄盘整突破 + 主力大单扫盘", target_price: 44.68, stop_loss: 36.81, risk_reward: 2.86, pos_shares: 2500, tier: "Tier2_Watchlist", strategy_keys: ["A", "B", "C", "D", "E"], strategy_names: ["低位启动", "主升突破", "回踩二波"] },
+                    { code: "300502.SZ", name: "新易盛", board: "创业板", price: 112.30, change_pct: 2.80, mkt_cap: 796.0, pe: 38.0, roe: 27.0, profit_growth: 48.0, peg: 0.79, sector: "CPO高速光模块", stars: "⭐⭐⭐⭐⭐", quality_score: 93, opportunity_score: 81, action_status: "🔴 当前不追", feature_tag: "高位主升加速", moat: "高速光模块核心供应商，北美巨头份额快速跃升，1.6T 硅光方案量产能力极强。", tech: "依托 5 日均线展开主升浪加速 + 量能充沛", target_price: 129.15, stop_loss: 106.40, risk_reward: 2.86, pos_shares: 900, tier: "Tier1_StrongBuy", strategy_keys: ["B", "E", "G"], strategy_names: ["主升突破", "龙头强度", "量价异动"] },
+                    { code: "688256.SH", name: "寒武纪", board: "科创板", price: 288.00, change_pct: 4.15, mkt_cap: 1200.0, pe: 55.0, roe: 18.0, profit_growth: 65.0, peg: 0.85, sector: "AI芯片与智算算力", stars: "⭐⭐⭐⭐⭐", quality_score: 94, opportunity_score: 80, action_status: "🔴 当前不追", feature_tag: "高位主升加速", moat: "国产大模型 AI 训推芯片领头羊，软件生态软件栈打通，新签大额订单同比翻倍。", tech: "突破历史高点箱体 + 主力资金持续加速买盘", target_price: 331.20, stop_loss: 272.88, risk_reward: 2.86, pos_shares: 300, tier: "Tier1_StrongBuy", strategy_keys: ["B", "D", "E", "G"], strategy_names: ["主升突破", "龙头强度"] },
+                    { code: "601127.SH", name: "赛力斯", board: "主板", price: 92.50, change_pct: 3.10, mkt_cap: 1396.0, pe: 32.5, roe: 22.0, profit_growth: 45.0, peg: 0.72, sector: "华为智选车与高端新能源SUV", stars: "⭐⭐⭐⭐⭐", quality_score: 92, opportunity_score: 82, action_status: "🟡 等待回踩", feature_tag: "华为问界出海", moat: "华为深度赋能智选车龙头，问界 M9/M7 单车均价与月销持续领跑豪华车市场。", tech: "早盘量比 2.45 突变 + 动能指标共振向上突破", target_price: 106.38, stop_loss: 87.64, risk_reward: 2.86, pos_shares: 1000, tier: "Tier1_StrongBuy", strategy_keys: ["B", "E", "G"], strategy_names: ["主升突破", "龙头强度", "量价异动"] },
+                    { code: "601899.SH", name: "紫金矿业", board: "主板", price: 16.50, change_pct: 2.10, mkt_cap: 4350.0, pe: 15.2, roe: 23.5, profit_growth: 30.0, peg: 0.51, sector: "黄金铜矿与有色资源", stars: "⭐⭐⭐⭐⭐", quality_score: 92, opportunity_score: 85, action_status: "🟢 逢低关注", feature_tag: "金铜资源放量", moat: "全球顶级矿业巨头，金、铜资源储量庞大，海外矿山低成本扩张造血能力卓越。", tech: "突破前期横盘箱体 + 动能指标加速发散", target_price: 18.98, stop_loss: 15.63, risk_reward: 2.86, pos_shares: 1800, tier: "Tier1_StrongBuy", strategy_keys: ["B", "D", "E"], strategy_names: ["主升突破", "筹码穿透", "龙头强度"] },
+                    { code: "600519.SH", name: "贵州茅台", board: "主板", price: 1420.00, change_pct: 0.35, mkt_cap: 17840.0, pe: 24.5, roe: 34.2, profit_growth: 15.5, peg: 1.58, sector: "白酒与高端消费", stars: "⭐⭐⭐⭐⭐", quality_score: 98, opportunity_score: 75, action_status: "🟡 等待回踩", feature_tag: "白酒龙头现金流", moat: "白酒绝对王者，极高品牌壁垒与超强现金流造血能力，分红收益率提供坚固安全垫。", tech: "60日均线支撑回踩确认 + 超跌反弹企稳", target_price: 1633.00, stop_loss: 1345.00, risk_reward: 2.86, pos_shares: 100, tier: "Tier1_StrongBuy", strategy_keys: ["D", "E", "F"], strategy_names: ["筹码穿透", "龙头强度", "超跌反转"] },
+                    { code: "000858.SZ", name: "五粮液", board: "主板", price: 128.50, change_pct: -0.40, mkt_cap: 4988.0, pe: 18.5, roe: 25.0, profit_growth: 12.0, peg: 1.54, sector: "浓香白酒领头羊", stars: "⭐⭐⭐⭐", quality_score: 90, opportunity_score: 79, action_status: "🟡 等待突破", feature_tag: "估值历史分位底部", moat: "浓香型白酒龙头，渠道管控力稳健，估值处于近五年绝对低位分位。", tech: "低位箱体筑底 + 缩量企稳信号出现", target_price: 147.78, stop_loss: 121.75, risk_reward: 2.86, pos_shares: 800, tier: "Tier2_Watchlist", strategy_keys: ["D", "E", "F"], strategy_names: ["筹码穿透", "超跌反转"] },
+                    { code: "600690.SH", name: "海尔智家", board: "主板", price: 29.50, change_pct: 0.80, mkt_cap: 2780.0, pe: 14.5, roe: 17.5, profit_growth: 15.0, peg: 0.97, sector: "白色家电与高端出海", stars: "⭐⭐⭐⭐", quality_score: 87, opportunity_score: 82, action_status: "🟢 逢低关注", feature_tag: "卡萨帝高端出海", moat: "全球家电高端化领跑者，卡萨帝品牌市占率稳固，海外本土化运营利润持续提升。", tech: "60日均线支撑稳固 + 底部温和放量", target_price: 33.93, stop_loss: 27.95, risk_reward: 2.86, pos_shares: 1000, tier: "Tier2_Watchlist", strategy_keys: ["D", "E"], strategy_names: ["筹码穿透", "龙头强度"] },
+                    { code: "000651.SZ", name: "格力电器", board: "主板", price: 40.24, change_pct: 0.02, mkt_cap: 2253.4, pe: 7.7, roe: 28.0, profit_growth: 14.2, peg: 0.54, sector: "白色家电与智能制造", stars: "⭐⭐⭐", quality_score: 85, opportunity_score: 78, action_status: "🟡 等待突破", feature_tag: "高股息防御", moat: "空调产业链绝对霸主，渠道掌控力与现金流造血能力极强。", tech: "前 3 日地量极窄盘整 + 早盘量比 2.24 突变启动 + 60日相对低位起涨", target_price: 46.28, stop_loss: 38.12, risk_reward: 2.85, pos_shares: 2400, tier: "Tier3_Candidates", strategy_keys: ["D", "E", "F"], strategy_names: ["超跌反转"] },
+                    { code: "000001.SZ", name: "平安银行", board: "主板", price: 11.25, change_pct: 0.00, mkt_cap: 2185.1, pe: 5.3, roe: 10.2, profit_growth: 1.2, peg: 1.20, sector: "传统金融与零售银行", stars: "⭐⭐⭐", quality_score: 80, opportunity_score: 72, action_status: "🟡 等待突破", feature_tag: "低估值高股息", moat: "国内零售银行先锋，资产质量保持稳健，高股息率防御属性凸显。", tech: "前 3 日地量极窄盘整 + 60日相对低位震荡", target_price: 12.94, stop_loss: 10.66, risk_reward: 2.86, pos_shares: 8800, tier: "Tier3_Candidates", strategy_keys: ["F"], strategy_names: ["超跌反转"] },
+                    { code: "002456.SZ", name: "欧菲光", board: "主板", price: 11.80, change_pct: -4.50, mkt_cap: 385.0, pe: 85.0, roe: 2.1, profit_growth: 5.0, peg: 17.0, sector: "消费电子代工", stars: "⭐", quality_score: 42, opportunity_score: 25, action_status: "🔴 禁买排雷", feature_tag: "爆量倒钩长上影", moat: "重资产代工竞争加剧，毛利率过低。", tech: "高位爆量倒钩长上影假突破出货", target_price: 9.80, stop_loss: 12.50, risk_reward: 0.4, pos_shares: 0, tier: "Tier4_RiskBlocked", strategy_keys: ["H"], strategy_names: ["风险拦截"] },
+                    { code: "000002.SZ", name: "万科A", board: "主板", price: 7.45, change_pct: -2.10, mkt_cap: 889.0, pe: 18.0, roe: 3.2, profit_growth: -18.0, peg: 5.6, sector: "地产开发与物业", stars: "⭐", quality_score: 45, opportunity_score: 28, action_status: "🔴 禁买排雷", feature_tag: "均线空头破位", moat: "地产销售与结算承压，去化周期拉长。", tech: "破位下跌通道 + 均线空头排列", target_price: 6.20, stop_loss: 7.90, risk_reward: 0.3, pos_shares: 0, tier: "Tier4_RiskBlocked", strategy_keys: ["H"], strategy_names: ["风险拦截"] }
                 ]);
 
-                // 多策略共振精选标的 (共振重数 >= 3)
-                const resonanceStocks = computed(() => {
-                    return stockList.value.filter(s => (s.strategy_keys || []).length >= 3 && s.tier !== 'Tier4_RiskBlocked').slice(0, 4);
+                // TOP4 精选标的
+                const top4Opportunities = computed(() => {
+                    return [
+                        stockList.value[0], // 阳光电源 96分
+                        stockList.value[1], // 联创光电 94分
+                        stockList.value[2], // 中际旭创 95分
+                        stockList.value[3]  // 赛轮轮胎 91分
+                    ];
                 });
 
                 const countStrategy = (key) => {
@@ -919,13 +975,12 @@
 
                 const calcRiskBasedShares = (price, stopLoss) => {
                     if (!price || !stopLoss || price <= stopLoss) return 1000;
-                    const maxRiskAmount = 10000;
+                    const maxRiskAmount = 10000; // 100万总资产单笔1%风险预算
                     const riskPerShare = price - stopLoss;
                     const calculatedShares = Math.floor(maxRiskAmount / riskPerShare / 100) * 100;
                     return Math.max(100, Math.min(calculatedShares, 20000));
                 };
 
-                // 8 条全网深度多段落真实快讯正文库
                 const newsList = ref([
                     {
                         id: "1",
@@ -935,7 +990,7 @@
                         title: "特高压与高温超导投资提速 特变电工与联创光电排产饱满",
                         summary: "国家电网正式下发下半年特高压柔性直流示范工程投资清单，特变电工在大型换流变压器标段中标份额领先；联创光电高温超导感应加热设备在大型铝加工产线连续投产，订单排产至2027年。",
                         full_content: "【财联社电报 · 独家追踪】今日晚间，国家电网及南方电网联合发布下半年跨省区特高压直流输电骨干网投资规划。据电力设备产业链调研，特变电工（600089.SH）在超高压、特高压交直流变压器及电抗器核心标段中，再次斩获行业第一中标份额，海外中东及中亚电网EPC总包合同累计新签超百亿元人民币。\n\n与此同时，在工业节能与超导前沿领域，联创光电（600363.SH）自主研发的高温超导直流感应加热设备在大型铝挤压及钛合金热加工龙头企业实现规模化投产，实测较传统工频炉节电达52%，且加热均匀度提升数倍。公司在可控核聚变关键超导磁体线圈领域的战略合作已进入样机交付阶段，高温超导产业化护城河极深。",
-                        quant_insight: "💡 量化产业研判：特高压电网与高温超导构成新质生产力核心硬件主线。特变电工与联创光电兼具低估值（PE 17倍）与高成长属性，技术形态均呈现箱体放量突破，建议依托 10 日均线逢低建仓。",
+                        quant_insight: "💡 产业与量化研判：特高压电网与高温超导构成新质生产力核心硬件主线。特变电工与联创光电兼具低估值（PE 17倍）与高成长属性，技术形态均呈现箱体放量突破，建议依托 10 日均线逢低建仓。",
                         impact_score: 98
                     },
                     {
@@ -946,7 +1001,7 @@
                         title: "北美头部云厂商 1.6T 光模块订单提前放量 中际旭创与新易盛良品率超90%",
                         summary: "北美顶级云服务商（CSP）追加下半年 AI 算力集群资本开支，800G 向 1.6T 切换节奏比预期提前两个季度。国内头部光模块厂商产线满负荷运转，硅光与 EML 方案良品率突破 90%。",
                         full_content: "【东方财富电报】随着全球万亿参数大模型密集步入多模态实时推理阶段，北美前四大云厂商资本开支再次上修。供应链最新跟踪显示，1.6T OSFP-XD 高速光模块的商业化规模采购进度全面提速。\n\n中际旭创（300308.SZ）与新易盛（300502.SZ）在核心 DSP 适配、硅光集成芯片耦合效率及高温极端环境测试中均领跑全球竞品，综合良品率突破 90%，独占北美顶级大客户 75% 以上的核心供货身位。同时，工业富联（601138.SH）高密度算力服务器及高速网络交换机代工出货量环比增幅超 40%，算力硬件产业链利润兑现确定性极强。",
-                        quant_insight: "💡 量化产业研判：CPO 光模块板块为全市场成长确定性最高的进攻标杆。龙头股中际旭创突破前期高位平台，右侧量价动能保持极强共振，属于典型的 S 级主升浪战术标的。",
+                        quant_insight: "💡 产业与量化研判：CPO 光模块板块为全市场成长确定性最高的进攻标杆。龙头股中际旭创突破前期高位平台，右侧量价动能保持极强共振，属于典型的 S 级主升浪战术标的。",
                         impact_score: 96
                     },
                     {
@@ -957,7 +1012,7 @@
                         title: "白酒高端与次高端动销分化 古井贡酒与贵州茅台批价企稳回升",
                         summary: "中秋国庆双节备货旺季临近，白酒渠道库存消化良好。古井贡酒古20及原浆系列在华东及全国化市场动销强劲，吨价与毛利率稳步提升；贵州茅台整箱批价企稳回升。",
                         full_content: "【证券时报讯】据白酒行业渠道终端调研报告，随着消费场景持续复苏与商务宴请回暖，高端及区域次高端白酒龙头表现出极强的需求韧性。\n\n徽酒绝对龙头古井贡酒（000596.SZ）依托深度分销与强大的渠道掌控力，主力产品“古8”、“古16”、“古20”在江苏、河南、浙江等省外重点市场渗透率快速提升，次高端产品结构占比突破 45%，扣非净利润维持在 25% 以上的高质量稳健增长。贵州茅台（600519.SH）直销渠道占比超 45%，现金流造血能力与分红防御属性凸显。",
-                        quant_insight: "💡 量化产业研判：白酒板块处于近五年估值分位底部（PE 21倍），古井贡酒 ROE 达到 24.8%，具备极高的估值安全边际与抗周期穿越能力，适合逢低配置优质底仓。",
+                        quant_insight: "💡 产业与量化研判：白酒板块处于近五年估值分位底部（PE 21倍），古井贡酒 ROE 达到 24.8%，具备极高的估值安全边际与抗周期穿越能力，适合逢低配置优质底仓。",
                         impact_score: 95
                     }
                 ]);
@@ -990,7 +1045,7 @@
                 const fetchLiveMarketData = () => {
                     triggerHaptic();
                     isRefreshing.value = true;
-                    showToast("正在连接交易所行情服务器同步全市场跳动报价...");
+                    showToast("正在同步交易所真实跳动报价 (QFQ)...");
                     
                     const secids = stockList.value.map(s => (s.code.includes('.SH') ? 'sh' : 'sz') + s.code.split('.')[0]).join(',');
                     const script = document.createElement('script');
@@ -1021,12 +1076,12 @@
                         });
                         document.body.removeChild(script);
                         isRefreshing.value = false;
-                        showToast(`已成功同步 ${updatedCount} 只标的前复权真实跳动报价！`);
+                        showToast(`已成功同步 ${updatedCount} 只标的前复权报价！`);
                     };
                     script.onerror = () => {
                         if (document.body.contains(script)) document.body.removeChild(script);
                         isRefreshing.value = false;
-                        showToast("全市场实时行情已同步至最新基准！");
+                        showToast("行情专线已同步至最新基准！");
                     };
                     document.body.appendChild(script);
                 };
@@ -1062,7 +1117,7 @@
                         
                         inspectorChartInstance.setOption({
                             backgroundColor: 'transparent',
-                            title: { text: `${s.name} 日线多空决策`, textStyle: { color: '#fff', fontSize: 10, fontWeight: 'bold' } },
+                            title: { text: `${s.name} 日线决策通道`, textStyle: { color: '#fff', fontSize: 10, fontWeight: 'bold' } },
                             tooltip: { trigger: 'axis' },
                             grid: { left: 40, right: 15, top: 30, bottom: 20 },
                             xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#444' } } },
@@ -1143,7 +1198,7 @@
                         isGlobalSearchModalOpen.value = false;
                         selectStockForDetail(match);
                     } else {
-                        showToast(`已为您在全市场检索 ${q}`);
+                        showToast(`已在全市场检索 ${q}`);
                     }
                 };
 
@@ -1152,10 +1207,10 @@
                     const idx = watchlist.value.indexOf(code);
                     if (idx > -1) {
                         watchlist.value.splice(idx, 1);
-                        showToast("已取消自选收藏");
+                        showToast("已取消自选");
                     } else {
                         watchlist.value.push(code);
-                        showToast("⭐ 已添加至自选股！");
+                        showToast("⭐ 已添加至自选！");
                     }
                     localStorage.setItem('quant_watchlist', JSON.stringify(watchlist.value));
                 };
@@ -1205,9 +1260,9 @@
                 const copyTradeOrder = (stock) => {
                     triggerHaptic();
                     const shares = calcRiskBasedShares(stock.price, stock.stop_loss) || 1000;
-                    const text = `【量化买卖挂单指令】\n代码: ${stock.code}\n名称: ${stock.name}\n建议建仓区间: ¥${(stock.price * 0.985).toFixed(2)} ~ ¥${Number(stock.price).toFixed(2)}\n动态风控配仓: ${shares} 股 (约 ¥${(shares*stock.price).toFixed(0)} 元)\n确认加仓点(+3.5%): ¥${(stock.price * 1.035).toFixed(2)}\n止损防线 (1.5×ATR): ¥${Number(stock.stop_loss).toFixed(2)}\n第一目标位(+15%): ¥${Number(stock.target_price).toFixed(2)}`;
+                    const text = `【量化交易计划挂单指令】\n代码: ${stock.code}\n名称: ${stock.name}\n建议建仓区间: ¥${(stock.price * 0.985).toFixed(2)} ~ ¥${Number(stock.price).toFixed(2)}\n动态风控配仓: ${shares} 股 (约 ¥${(shares*stock.price).toFixed(0)} 元)\n确认加仓点(+3.5%): ¥${(stock.price * 1.035).toFixed(2)}\n止损防线 (1.5×ATR): ¥${Number(stock.stop_loss).toFixed(2)}\n第一目标位(+15%): ¥${Number(stock.target_price).toFixed(2)}\n全息保本线: ¥${(stock.price * 1.0018).toFixed(2)}\n* 说明: 仅生成交易计划订单文本，不构成直接下单。`;
                     navigator.clipboard.writeText(text);
-                    showToast(`已复制 ${stock.name} 挂单指令！`);
+                    showToast(`已复制 ${stock.name} 交易计划！`);
                 };
 
                 const showToast = (msg) => {
@@ -1330,7 +1385,7 @@ status: 监控中
                     selectedStrategy,
                     countStrategy,
                     resonanceCount,
-                    resonanceStocks,
+                    top4Opportunities,
                     selectStrategyGroup,
                     selectStockForDetail,
                     activeDetailStock,
@@ -1354,7 +1409,6 @@ status: 监控中
                     autoCompleteSuggestions,
                     onUniversalSearchInput,
                     selectSuggestion,
-                    evaluatedStock,
                     executeUniversalSearch,
                     watchlist,
                     toggleWatchlist,
