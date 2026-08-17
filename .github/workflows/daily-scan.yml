@@ -1,5 +1,8 @@
 name: 每日全市场量化扫描
 on:
+  push:
+    branches: [main]
+    paths-ignore: ['data/**']
   schedule:
     - cron: '50 0 * * 1-5'
     - cron: '20 7 * * 1-5'
