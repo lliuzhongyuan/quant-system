@@ -1,8 +1,8 @@
-import sys
+import sys, json
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import engine
-from data_sources import robust_kline
+from data_sources import robust_kline, source_probe
 from engine import scan_all, update_news
 from backtest import run as run_backtest
 from data_quality import validate
@@ -13,12 +13,19 @@ from walkforward import run as run_walkforward
 from sector_engine import run as run_sector
 from news_aggregator import run as run_news_aggregator
 
-# Production K-line policy: Tencent forward-adjusted first, Sina real K-line fallback.
-# No synthetic/demo fallback is permitted.
+# Production K-line policy: Tencent QFQ -> Tencent legacy QFQ -> Eastmoney QFQ -> Sina.
+# No synthetic/demo/stale fallback is permitted.
 engine.fetch_kline = robust_kline
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 
 def production():
+    # Fail fast if all real K-line providers are unavailable; never waste a full scan and never publish stale data.
+    probe=source_probe('600519')
+    Path('data').mkdir(exist_ok=True)
+    Path('data/provider_health.json').write_text(json.dumps({'generated_at':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),'providers':probe},ensure_ascii=False,indent=2),encoding='utf8')
+    available=[k for k,v in probe.items() if v.get('ok')]
+    if not available:
+        raise SystemExit('BLOCKED: no real K-line provider passed the preflight probe')
     scan_all()
     validate(True)
     run_sector()
