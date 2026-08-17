@@ -10,10 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
       - name: Test Sina stock list
-        run: python -c "import requests; u='https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData'; p={'node':'sh_a','page':1,'num':80,'sort':'symbol','asc':1}; r=requests.get(u,params=p,headers={'Referer':'https://vip.stock.finance.sina.com.cn/','User-Agent':'Mozilla/5.0'},timeout=15); r.raise_for_status(); d=r.json(); print('sina sh_a=',len(d)); assert len(d)>20"
+        run: |
+          curl --fail --silent --show-error --location --max-time 20 'https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?node=sh_a&page=1&num=80&sort=symbol&asc=1' -o /tmp/sina.json
+          python -c "import json; d=json.load(open('/tmp/sina.json')); print('sina sh_a=',len(d)); assert len(d)>20"
       - name: Test Sina Kline
-        run: python -c "import requests; u='https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData'; p={'symbol':'sh600519','scale':240,'ma':'5,10,20,60','datalen':130}; r=requests.get(u,params=p,headers={'Referer':'https://finance.sina.com.cn/','User-Agent':'Mozilla/5.0'},timeout=15); r.raise_for_status(); d=r.json(); print('sina kline=',len(d)); assert len(d)>60"
+        run: |
+          curl --fail --silent --show-error --location --max-time 20 'https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=sh600519&scale=240&ma=5,10,20,60&datalen=130' -o /tmp/k.json
+          python -c "import json; d=json.load(open('/tmp/k.json')); print('sina kline=',len(d)); assert len(d)>60"
