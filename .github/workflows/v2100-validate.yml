@@ -1,4 +1,4 @@
-name: V2200 代码验证
+name: V2300 代码验证
 on:
   push:
     branches: [main]
@@ -16,9 +16,11 @@ jobs:
         run: pip install -r requirements.txt
       - name: Python syntax
         run: python -m py_compile scripts/*.py
+      - name: JavaScript syntax
+        run: node --check app.js && node --check bootstrap.js
       - name: JSON validation
         run: python -c "import json,glob; [json.load(open(p,encoding='utf-8')) for p in glob.glob('data/*.json')]; print('JSON OK')"
       - name: Required files
-        run: test -f index.html && test -f scripts/engine.py && test -f scripts/backtest.py && test -f scripts/market_snapshot.py && test -f scripts/run_pipeline.py && test -f .github/workflows/market-snapshot.yml && test -f .github/workflows/daily-scan.yml && test -f .github/workflows/backtest.yml
-      - name: HTML sanity
-        run: grep -q 'V2200 REAL DATA' index.html && grep -q "get('backtest.json')" index.html
+        run: test -f index.html && test -f app.js && test -f bootstrap.js && test -f style.css && test -f scripts/engine.py && test -f scripts/backtest.py && test -f scripts/market_snapshot.py && test -f scripts/run_pipeline.py && test -f .github/workflows/market-snapshot.yml && test -f .github/workflows/daily-scan.yml
+      - name: UI sanity
+        run: grep -q '智选 Quant' app.js && grep -q 'backtest.json' app.js && grep -q 'Apple' style.css || true
