@@ -1,5 +1,8 @@
 name: 每日全市场量化扫描
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '50 0 * * 1-5'   # 北京 08:50
     - cron: '20 7 * * 1-5'   # 北京 15:20
@@ -9,11 +12,12 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
+        with:
+          python-version: '3.12'
       - run: pip install -r requirements.txt
       - run: python scripts/run_pipeline.py all
       - name: Commit data
