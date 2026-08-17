@@ -15,7 +15,19 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - name: Test production market pipeline
+      - name: Test full market list
         run: python scripts/market_snapshot.py
-      - name: Assert 5000+ universe path
-        run: python -c "import json; d=json.load(open('data/market.json',encoding='utf-8')); print('universe=',d['count']); assert d['count']>1000"
+      - name: Assert universe and K-line sample
+        run: |
+          python - <<'PY'
+          import json, sys
+          sys.path.insert(0, 'scripts')
+          from engine import fetch_kline
+          d=json.load(open('data/market.json', encoding='utf-8'))
+          print('universe=', d['count'])
+          assert d['count'] > 4000
+          rows=[fetch_kline(x['symbol'],130) for x in d['items'][:50]]
+          ok=sum(len(r)>=65 for r in rows)
+          print('kline_ok=', ok, '/50')
+          assert ok >= 40
+          PY
