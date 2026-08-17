@@ -1,38 +1,26 @@
-# 智选量化终端 V2100 · 真实数据闭环版
+# 智选量化终端 V2200
 
-这版把数据链路重构为：**真实行情 → 全市场股票池 → 历史 K 线 → A~H 策略 → 风控 → JSON 数据 → GitHub Pages UI**。
+个人 A 股研究/选股终端，核心原则：真实数据、全市场扫描、A~H 多策略共振、风险拦截、失败不伪造。
 
-## 当前数据源与可用性
+## 数据链路
+- 股票池：新浪财经公开 A 股列表。
+- 日 K：新浪财经公开日 K，默认 180 根。
+- 财务摘要：只对头部候选调用东方财富公开摘要；失败显示“待财报数据”。
+- 指数：上证、深证、创业板、沪深300，用于市场温度和仓位建议。
+- 新闻：新浪财经 7×24 作为生产回退；抓取失败时不展示模拟新闻。
 
-GitHub Actions 实测发现，东方财富 `push2.eastmoney.com` 在 GitHub-hosted runner 上会出现 502/连接被远端关闭，因此生产全市场行情链路已切换为**新浪财经公开列表 API + 新浪日K API**。两条接口均已在本仓库 Actions 环境实测成功：股票列表、日K均可访问。
+## A~H
+A 低位启动；B 主升突破；C 回踩二波；D 筹码结构穿透（成交成本代理，不是真实筹码分布）；E 龙头强度；F 超跌反转；G 量价异动；H 风险拦截。
 
-- 新浪财经列表：`vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData`
-- 新浪财经日K：`money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData`
-- 东方财富财务摘要：作为可选增强；GitHub Actions 无法访问时显示“待财报数据”，不伪造 ROE/利润。
-- 东方财富 7×24：如果接口不可用，新闻区保持为空，不用静态新闻冒充实时资讯。
+评分保留趋势、位置、动量、量能/资金代理、基本面和风险扣分，并输出质量分、机会分、共振数、ATR止损/目标。
 
-新浪列表 API 提供名称、最新价、涨跌幅、成交量、成交额、PE、PB、总市值、流通市值、换手率等字段；日K接口提供 OHLCV 历史数据。相关接口结构与字段说明可参考公开接口探查资料。citeturn6view0turn7search0
+## 回测
+`backtest.py` 使用保存的历史 K 线做 walk-forward 研究样本，只有真实计算完成才显示收益率、胜率、回撤和 Sharpe 代理，不使用写死指标。仍需进一步加入手续费、滑点和涨跌停成交约束后才适合严肃策略评估。
 
-## 重要边界
+## 自动化
+- `market-snapshot.yml`：盘中每 5 分钟更新市场快照。
+- `daily-scan.yml`：交易日执行全市场扫描和新闻。
+- `backtest.yml`：周末自动生成研究型回测。
+- `v2100-validate.yml`：基础代码验证。
 
-1. GitHub Pages 是静态托管，不能提供真正的持续后台服务：
-   - `market-snapshot.yml` 每 5 分钟生成一次全市场行情快照；
-   - 浏览器盘中每 30 秒直连公开行情接口，刷新指数行情；
-   - `daily-scan.yml` 在开盘前/收盘后运行全市场历史 K 线扫描并生成 `signals.json`；
-   - 如果要求 5000+ 股票每 30 秒重新计算全部策略，必须部署常驻后端（Cloud Run / VPS / Worker 等）。
-2. 不生成假 ROE、假利润增速、假 K 线、假 VWAP、假新闻或假回测指标。ATR 使用历史 K 线计算，数据不足直接放弃该信号。
-3. D 策略明确是“筹码结构穿透（成交成本代理）”，公开行情接口没有完整筹码分布，不能把代理指标冒充真实筹码峰。
-4. 回测页面不展示旧版固定收益、Sharpe 或胜率；只有真实回测数据生成后才显示。
-5. 选股池排除 ST、退市、停牌、科创板（688）和北交所代码（8/4），与此前系统口径保持一致。
-
-## 部署
-
-GitHub Pages 从 `main` 根目录发布。Actions 需要 `contents: write` 才能自动提交数据快照；如果仓库 Settings → Actions → General 的 Workflow permissions 不是 Read and write，需要开启。
-
-GitHub Actions 的计划任务最短间隔为 5 分钟，因此不能把它当作 30 秒后台行情服务器。真正的 30 秒全市场重算需要常驻后端。
-
-## 策略
-
-A 低位启动 / B 主升突破 / C 回踩二波 / D 筹码结构代理 / E 龙头强度 / F 超跌反转 / G 量价异动 / H 风险拦截。
-
-策略计算直接使用历史 K 线，而不是用几个实时字段伪装完整策略。
+GitHub Actions 的 scheduled workflow 最短间隔是 5 分钟；GitHub Pages 本身不是持久化后端，因此不能在 Pages 上实现 5000+ 股票每 30 秒全市场重算。若未来要求真正 30 秒级全市场重算，应迁移到常驻后端（Cloud Run/VPS/Worker）。
