@@ -1,7 +1,8 @@
 name: V2100 代码验证
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,23 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
-      - run: pip install -r requirements.txt
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
       - name: Python syntax
         run: python -m py_compile scripts/*.py
-      - name: Validate JSON
-        run: python - <<'PY'
-          import json
-          from pathlib import Path
-          for p in Path('data').glob('*.json'):
-              json.loads(p.read_text(encoding='utf-8'))
-              print('OK', p)
-          PY
-      - name: Validate required files
-        run: |
-          test -f index.html
-          test -f scripts/engine.py
-          test -f scripts/market_snapshot.py
-          test -f scripts/run_pipeline.py
-          test -f .github/workflows/market-snapshot.yml
-          test -f .github/workflows/daily-scan.yml
+      - name: JSON validation
+        run: python -c "import json,glob; [json.load(open(p,encoding='utf-8')) for p in glob.glob('data/*.json')]; print('JSON OK')"
+      - name: Required files
+        run: test -f index.html && test -f scripts/engine.py && test -f scripts/market_snapshot.py && test -f scripts/run_pipeline.py && test -f .github/workflows/market-snapshot.yml && test -f .github/workflows/daily-scan.yml
