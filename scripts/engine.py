@@ -4,11 +4,11 @@ from pathlib import Path
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from data_sources import robust_kline, source_probe
 
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'; STOCKS=DATA/'stocks'; STOCKS.mkdir(parents=True,exist_ok=True)
 UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151 Safari/537.36'
 LIST_URL='https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData'
-KLINE_URL='https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData/getKLineData'
 QUOTE_URL='https://hq.sinajs.cn/list='; NEWS_URL='https://finance.sina.com.cn/7x24/notification.shtml'
 RETRY=Retry(total=2,connect=2,read=2,status=2,backoff_factor=.35,status_forcelist=(429,500,502,503,504),allowed_methods=frozenset(['GET']))
 S=requests.Session(); S.mount('https://',HTTPAdapter(max_retries=RETRY)); S.headers.update({'User-Agent':UA,'Referer':'https://finance.sina.com.cn/'})
@@ -24,12 +24,6 @@ def write_json(path,obj):
 
 def exchange(code): return 'sh' if str(code).startswith(('5','6','9')) else 'sz'
 def full_code(code): return str(code)+('.SH' if exchange(code)=='sh' else '.SZ')
-
-def fetch_kline(code,limit=180):
-    try:
-        a=S.get(KLINE_URL,params={'symbol':exchange(code)+str(code),'scale':240,'ma':'5,10,20,60','datalen':limit},timeout=12).json() or []
-        return [{'date':str(x.get('day',''))[:10],'open':num(x.get('open')),'close':num(x.get('close')),'high':num(x.get('high')),'low':num(x.get('low')),'volume':num(x.get('volume'),0),'amount':num(x.get('amount'),0)} for x in a]
-    except Exception:return []
 
 def fetch_market():
     raw=[]
@@ -53,7 +47,7 @@ def fetch_indices():
     try:
         text=S.get(QUOTE_URL+'sh000001,sz399001,sz399006,sh000300',timeout=8).content.decode('gbk','ignore'); out=[]
         for line in text.splitlines():
-            m=re.search(r'hq_str_([a-z0-9]+)="([^"]*)"',line,re.I)
+            m=re.search(r'hq_str_([a-z0-9]+)=\"([^\"]*)\"',line,re.I)
             if not m: continue
             p=m.group(2).split(','); prev=num(p[2]) if len(p)>2 else None; ch=num(p[3],0) if len(p)>3 else 0
             out.append({'code':m.group(1),'name':p[0],'price':num(p[1]),'change':ch,'change_pct':ch/prev*100 if prev else None})
@@ -128,15 +122,21 @@ def score_signal(s,rows):
     resonance=len([x for x in st if x!='H']); tier='D' if blocked else 'S' if resonance>=3 and quality>=70 and opportunity>=70 else 'A' if resonance>=2 and quality>=58 else 'B' if resonance else 'C'
     action='🔴 风险拦截' if blocked else '🟢 当前可买' if tier=='S' and s.get('change_pct',0)<=3.5 else '🟡 等待回踩' if tier=='S' else '🟡 等待确认' if tier=='A' else '👀 观察' if tier=='B' else '—'
     stop=max(0,p-1.5*(a or p*.03)); target=p+2.5*(a or p*.03); risk_per=max(.01,p-stop)
-    return {**s,'ma5':round(m5,3),'ma10':round(m10,3),'ma20':round(m20,3),'ma60':round(m60,3),'rsi14':round(rs,2) if rs is not None else None,'macd_dif':round(dif,4) if dif is not None else None,'macd_dea':round(dea,4) if dea is not None else None,'macd_hist':round(mh,4) if mh is not None else None,'kdj_k':round(k,2),'kdj_d':round(d,2),'kdj_j':round(j,2),'atr14':round(a,3) if a else None,'volume_ratio_calc':round(vr,2),'main_force_proxy':force,'position60':round(pos,3),'return5d':round(ret5*100,2),'return20d':round(ret20*100,2),'drawdown20':round(dd20*100,2),'volume_contraction':round(vc,3),'trend_score':trend,'position_score':position,'momentum_score':momentum,'funds_score':funds,'basic_score':basic,'risk_deduction':risk,'quality_score':quality,'opportunity_score':opportunity,'strategy_keys':st,'strategy_names':[STRATEGIES[x] for x in st],'resonance_count':resonance,'tier':tier,'action_status':action,'signal_reason':'；'.join(why[:5]) or '暂无有效策略信号','target_price':round(target,2),'stop_loss':round(stop,2),'risk_reward':round((target-p)/risk_per,2),'signal_confidence':round(min(99,max(1,opportunity*.45+quality*.35+force*.20)),1),'signal_time':dt.datetime.now(dt.timezone.utc).isoformat(),'data_quality':'technical_real'}
+    provider=rows[-1].get('source','unknown') if rows else 'unknown'
+    return {**s,'kline_source':provider,'kline_rows':len(rows),'ma5':round(m5,3),'ma10':round(m10,3),'ma20':round(m20,3),'ma60':round(m60,3),'rsi14':round(rs,2) if rs is not None else None,'macd_dif':round(dif,4) if dif is not None else None,'macd_dea':round(dea,4) if dea is not None else None,'macd_hist':round(mh,4) if mh is not None else None,'kdj_k':round(k,2),'kdj_d':round(d,2),'kdj_j':round(j,2),'atr14':round(a,3) if a else None,'volume_ratio_calc':round(vr,2),'main_force_proxy':force,'position60':round(pos,3),'return5d':round(ret5*100,2),'return20d':round(ret20*100,2),'drawdown20':round(dd20*100,2),'volume_contraction':round(vc,3),'trend_score':trend,'position_score':position,'momentum_score':momentum,'funds_score':funds,'basic_score':basic,'risk_deduction':risk,'quality_score':quality,'opportunity_score':opportunity,'strategy_keys':st,'strategy_names':[STRATEGIES[x] for x in st],'resonance_count':resonance,'tier':tier,'action_status':action,'signal_reason':'；'.join(why[:5]) or '暂无有效策略信号','target_price':round(target,2),'stop_loss':round(stop,2),'risk_reward':round((target-p)/risk_per,2),'signal_confidence':round(min(99,max(1,opportunity*.45+quality*.35+force*.20)),1),'signal_time':dt.datetime.now(dt.timezone.utc).isoformat(),'data_quality':'technical_real'}
 
 def scan_all(workers=12,kline_limit=180):
     stocks=fetch_market(); indices=fetch_indices(); total=len(stocks); now=dt.datetime.now(dt.timezone.utc).isoformat()
+    probe=source_probe('600519')
+    write_json(DATA/'provider_health.json',{'checked_at':now,'probe_symbol':'600519','providers':probe,'healthy_providers':sum(1 for x in probe.values() if x.get('ok')),'data_quality':'real_provider_probe'})
+    if not any(x.get('ok') for x in probe.values()):
+        write_json(DATA/'scan_status.json',{'status':'blocked','reason':'all_kline_providers_unavailable','universe':total,'scanned':0,'failed':total,'progress':0})
+        raise RuntimeError('All K-line providers unavailable')
     breadth={'advancers':sum(x['change_pct']>0 for x in stocks),'decliners':sum(x['change_pct']<0 for x in stocks),'flat':sum(x['change_pct']==0 for x in stocks),'limit_up':sum(x['change_pct']>=9.5 for x in stocks),'limit_down':sum(x['change_pct']<=-9.5 for x in stocks)}
     write_json(DATA/'scan_status.json',{'status':'running','started_at':now,'universe':total,'scanned':0,'failed':0,'progress':0})
     results=[]; failed=0
     def one(s):
-        rows=fetch_kline(s['symbol'],kline_limit); return score_signal(s,rows),rows
+        rows=robust_kline(s['symbol'],kline_limit); return score_signal(s,rows),rows
     with ThreadPoolExecutor(max_workers=workers) as ex:
         fs={ex.submit(one,s):s for s in stocks}
         for i,f in enumerate(as_completed(fs),1):
@@ -151,9 +151,11 @@ def scan_all(workers=12,kline_limit=180):
     for p in STOCKS.glob('*.json'):
         if p.name not in keep_names: p.unlink(missing_ok=True)
     for q,rows in keep: write_json(STOCKS/(q['symbol']+'.json'),{'stock':q,'klines':rows})
-    rg=regime(indices,breadth); market_obj={'updated_at':now,'source':'Sina Finance A-share list + daily K-line','universe':total,'scanned':len(signals),'failed':failed,'indices':indices,'breadth':breadth,'regime':rg,'data_quality':'real_market_and_daily_technical'}
-    write_json(DATA/'market.json',market_obj); write_json(DATA/'signals.json',{'updated_at':now,'universe':total,'scanned':len(signals),'failed':failed,'items':signals,'strategy_catalog':STRATEGIES,'methodology':'A-H multi-factor technical engine; D is a cost/volume proxy, not true chip distribution.'})
-    write_json(DATA/'scan_status.json',{'status':'success','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'universe':total,'scanned':len(signals),'failed':failed,'progress':100})
+    rg=regime(indices,breadth); source_counts={}
+    for q in signals: source_counts[q.get('kline_source','unknown')]=source_counts.get(q.get('kline_source','unknown'),0)+1
+    market_obj={'updated_at':now,'source':'Sina A-share list + multi-source daily K-line','universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(len(signals)/max(1,total)*100,2),'kline_source_counts':source_counts,'indices':indices,'breadth':breadth,'regime':rg,'data_quality':'real_market_and_multi_source_daily_technical'}
+    write_json(DATA/'market.json',market_obj); write_json(DATA/'signals.json',{'updated_at':now,'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(len(signals)/max(1,total)*100,2),'items':signals,'strategy_catalog':STRATEGIES,'methodology':'A-H multi-factor technical engine; D is a cost/volume proxy, not true chip distribution.'})
+    write_json(DATA/'scan_status.json',{'status':'success','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(len(signals)/max(1,total)*100,2),'progress':100})
     return market_obj
 
 def update_news():
