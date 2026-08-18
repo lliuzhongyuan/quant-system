@@ -2,7 +2,7 @@ import sys, json
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import engine
-from data_sources import robust_kline, source_probe
+from data_sources import robust_kline
 from engine import scan_all, update_news
 from backtest import run as run_backtest
 from data_quality import validate
@@ -13,6 +13,7 @@ from walkforward import run as run_walkforward
 from sector_engine import run as run_sector
 from news_aggregator import run as run_news_aggregator
 from universe_snapshot import run as run_universe_snapshot
+from provider_probe import run as run_provider_probe
 
 # Production K-line policy: Tencent QFQ -> Tencent legacy QFQ -> Eastmoney QFQ -> Sina.
 # No synthetic/demo/stale fallback is permitted.
@@ -20,24 +21,13 @@ engine.fetch_kline = robust_kline
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 
 def production():
-    # Build the dynamic universe accounting first. This is diagnostic and does not replace engine's own market fetch.
+    # Refresh dynamic universe and provider health exactly once at the start of each production run.
     universe = run_universe_snapshot()
-
-    # Reuse the same-run provider preflight when available; never probe the same single symbol twice.
-    probe_path=Path('data/provider_health.json')
-    if probe_path.exists():
-        try:
-            payload=json.loads(probe_path.read_text(encoding='utf8'))
-            probe=payload.get('provider_health') or payload.get('providers') or {}
-        except Exception:
-            probe=source_probe('600519')
-    else:
-        probe=source_probe('600519')
-        Path('data').mkdir(exist_ok=True)
-        Path('data/provider_health.json').write_text(json.dumps({'generated_at':__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),'providers':probe},ensure_ascii=False,indent=2),encoding='utf8')
+    probe_payload = run_provider_probe()
+    probe = probe_payload.get('provider_health') or {}
     available=[k for k,v in probe.items() if v.get('ok')]
     if not available:
-        raise SystemExit('BLOCKED: no real K-line provider passed the preflight probe')
+        raise SystemExit('BLOCKED: no real K-line provider passed the multi-symbol preflight')
 
     market=scan_all()
     # Attach the dynamic universe layers to the production snapshot before the quality gate.
