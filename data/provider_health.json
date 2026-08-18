@@ -1,0 +1,151 @@
+{
+  "provider_health": {
+    "Baostock": {
+      "ok": true,
+      "rows": 80,
+      "working_symbol": "600519",
+      "samples": [
+        {
+          "symbol": "600519",
+          "ok": true,
+          "rows": 80
+        },
+        {
+          "symbol": "000001",
+          "ok": true,
+          "rows": 80
+        },
+        {
+          "symbol": "300750",
+          "ok": true,
+          "rows": 80
+        }
+      ]
+    },
+    "Yahoo Finance Batch": {
+      "ok": false,
+      "rows": 0,
+      "working_symbol": null,
+      "samples": [
+        {
+          "symbol": "600519",
+          "ok": false,
+          "rows": 0
+        },
+        {
+          "symbol": "000001",
+          "ok": false,
+          "rows": 0
+        },
+        {
+          "symbol": "300750",
+          "ok": false,
+          "rows": 0
+        }
+      ]
+    },
+    "Tencent QFQ": {
+      "ok": false,
+      "rows": 0,
+      "working_symbol": null,
+      "samples": [
+        {
+          "symbol": "600519",
+          "ok": false,
+          "rows": 0,
+          "error": "JSONDecodeError"
+        },
+        {
+          "symbol": "000001",
+          "ok": false,
+          "rows": 0,
+          "error": "JSONDecodeError"
+        },
+        {
+          "symbol": "300750",
+          "ok": false,
+          "rows": 0,
+          "error": "JSONDecodeError"
+        }
+      ]
+    },
+    "Tencent Legacy": {
+      "ok": false,
+      "rows": 0,
+      "working_symbol": null,
+      "samples": [
+        {
+          "symbol": "600519",
+          "ok": false,
+          "rows": 0
+        },
+        {
+          "symbol": "000001",
+          "ok": false,
+          "rows": 0
+        },
+        {
+          "symbol": "300750",
+          "ok": false,
+          "rows": 0
+        }
+      ]
+    },
+    "Eastmoney QFQ": {
+      "ok": false,
+      "rows": 0,
+      "working_symbol": null,
+      "samples": [
+        {
+          "symbol": "600519",
+          "ok": false,
+          "rows": 0,
+          "error": "ConnectionError"
+        },
+        {
+          "symbol": "000001",
+          "ok": false,
+          "rows": 0,
+          "error": "ConnectionError"
+        },
+        {
+          "symbol": "300750",
+          "ok": false,
+          "rows": 0,
+          "error": "ConnectionError"
+        }
+      ]
+    },
+    "Sina": {
+      "ok": false,
+      "rows": 0,
+      "working_symbol": null,
+      "samples": [
+        {
+          "symbol": "600519",
+          "ok": false,
+          "rows": 0
+        },
+        {
+          "symbol": "000001",
+          "ok": false,
+          "rows": 0
+        },
+        {
+          "symbol": "300750",
+          "ok": false,
+          "rows": 0
+        }
+      ]
+    }
+  },
+  "healthy_providers": 1,
+  "required_minimum": 1,
+  "sample_symbols": [
+    "600519",
+    "000001",
+    "300750"
+  ],
+  "status": "PASS",
+  "data_quality": "real_free_multi_symbol_preflight_retry"
+}
