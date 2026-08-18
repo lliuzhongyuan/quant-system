@@ -86,9 +86,7 @@ def robust_kline(code,limit=180):
     return []
 
 def source_probe(code='600519'):
-    # The production workflow already performs the provider probe. Reuse that result
-    # inside the same run instead of probing all four endpoints a second time and
-    # potentially triggering provider throttling.
+    # Reuse the same-run provider preflight result to avoid duplicate requests and throttling.
     cache=Path(__file__).resolve().parents[1]/'data'/'provider_health.json'
     try:
         payload=json.loads(cache.read_text(encoding='utf-8'))
