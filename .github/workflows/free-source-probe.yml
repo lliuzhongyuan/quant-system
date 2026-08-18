@@ -4,6 +4,7 @@ on:
     paths:
       - 'scripts/free_source_probe.py'
       - 'requirements.txt'
+      - '.github/workflows/free-source-probe.yml'
   workflow_dispatch:
 jobs:
   probe:
