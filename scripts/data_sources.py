@@ -42,7 +42,7 @@ def _yahoo_rows(node):
         for i,t in enumerate(ts):
             vals=[q.get(k,[None]*len(ts))[i] if i<len(q.get(k,[])) else None for k in ('open','close','high','low','volume')]
             if any(v is None for v in vals[:4]): continue
-            out.append({'date':dt.datetime.fromtimestamp(t,dt.timezone.utc).date().isoformat(),'open':float(vals[0]),'close':float(vals[1]),'high':float(vals[2]),'low':float(vals[3]),'volume':float(vals[4] or 0),'amount':0.0,'source':'Yahoo Finance Batch','fetched_at':stamp()})
+            out.append({'date':dt.datetime.fromtimestamp(t,dt.timezone.utc).date().isoformat(),'open':float(vals[0]),'close':float(vals[1]),'high':float(vals[2]),'low':float(vals[3]),'volume':float(vals[4] or 0),'amount':0.0,'source':'Yahoo Finance','fetched_at':stamp()})
         return out
     except Exception: return []
 
@@ -82,6 +82,7 @@ def baostock_kline(code,limit=180):
         end=dt.date.today().isoformat(); start=(dt.date.today()-dt.timedelta(days=420)).isoformat()
         rs=bs.query_history_k_data_plus(f'{market(code)}.{code}','date,open,high,low,close,volume,amount',start_date=start,end_date=end,frequency='d',adjustflag='2')
         out=[]
+        if getattr(rs,'error_code','0')!='0': return []
         while rs.next():
             row=rs.get_row_data()
             if len(row)>=7 and row[0]:
@@ -117,7 +118,8 @@ def yahoo_kline(code,limit=180): return yahoo_batch([code],range_='1y',interval=
 def robust_kline(code,limit=180):
     cached=load_cached(code,limit)
     if cached:return cached
-    for fn in (baostock_kline,yahoo_kline,tencent_kline,tencent_legacy_kline,eastmoney_kline,sina_kline):
+    # Yahoo single-symbol Spark is currently the only source proven 3/3 from the free-source probe.
+    for fn in (yahoo_kline,baostock_kline,tencent_kline,tencent_legacy_kline,eastmoney_kline,sina_kline):
         try:
             rows=fn(code,limit)
             if len(rows)>=80:return rows
@@ -131,7 +133,7 @@ def source_probe(code='600519'):
         if isinstance(cached,dict) and cached:return cached
     except Exception:pass
     out={}
-    for name,fn in [('Baostock',baostock_kline),('Yahoo Finance Batch',yahoo_kline),('Tencent QFQ',tencent_kline),('Tencent Legacy',tencent_legacy_kline),('Eastmoney QFQ',eastmoney_kline),('Sina',sina_kline)]:
+    for name,fn in [('Yahoo Finance',yahoo_kline),('Baostock',baostock_kline),('Tencent QFQ',tencent_kline),('Tencent Legacy',tencent_legacy_kline),('Eastmoney QFQ',eastmoney_kline),('Sina',sina_kline)]:
         try: rows=fn(code,80); out[name]={'ok':len(rows)>=80,'rows':len(rows)}
         except Exception as e: out[name]={'ok':False,'rows':0,'error':type(e).__name__}
     return out
