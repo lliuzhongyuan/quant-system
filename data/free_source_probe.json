@@ -1,0 +1,97 @@
+{
+  "status": "PASS",
+  "healthy_sources": 2,
+  "sample_symbols": [
+    "600519",
+    "000001",
+    "300750"
+  ],
+  "sources": {
+    "Yahoo Finance Spark": {
+      "600519": {
+        "ok": true,
+        "rows": 243,
+        "http_status": 200
+      },
+      "000001": {
+        "ok": true,
+        "rows": 242,
+        "http_status": 200
+      },
+      "300750": {
+        "ok": true,
+        "rows": 243,
+        "http_status": 200
+      }
+    },
+    "Tencent QFQ": {
+      "600519": {
+        "ok": false,
+        "rows": 0,
+        "http_status": 200
+      },
+      "000001": {
+        "ok": false,
+        "rows": 0,
+        "http_status": 200
+      },
+      "300750": {
+        "ok": false,
+        "rows": 0,
+        "http_status": 200
+      }
+    },
+    "Eastmoney QFQ": {
+      "600519": {
+        "ok": true,
+        "rows": 5985,
+        "http_status": 200
+      },
+      "000001": {
+        "ok": true,
+        "rows": 8460,
+        "http_status": 200
+      },
+      "300750": {
+        "ok": false,
+        "rows": 0,
+        "error": "ConnectionError"
+      }
+    },
+    "Sina KLine": {
+      "600519": {
+        "ok": false,
+        "rows": 2,
+        "http_status": 200
+      },
+      "000001": {
+        "ok": false,
+        "rows": 2,
+        "http_status": 200
+      },
+      "300750": {
+        "ok": false,
+        "rows": 2,
+        "http_status": 200
+      }
+    },
+    "Baostock": {
+      "600519": {
+        "ok": false,
+        "rows": 0,
+        "error": "AttributeError"
+      },
+      "000001": {
+        "ok": false,
+        "rows": 0,
+        "error": "AttributeError"
+      },
+      "300750": {
+        "ok": false,
+        "rows": 0,
+        "error": "AttributeError"
+      }
+    }
+  },
+  "generated_at": 1787039368.735105
+}
