@@ -18,8 +18,6 @@ engine.fetch_kline = robust_kline
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 
 def production():
-    # provider_probe.py already ran immediately before this script in the workflow.
-    # Reusing its result avoids a second network probe/rate-limit race.
     universe = run_universe_snapshot()
     probe_path = Path('data/provider_health.json')
     if not probe_path.exists():
@@ -27,11 +25,11 @@ def production():
     try:
         payload = json.loads(probe_path.read_text(encoding='utf8'))
         probe = payload.get('provider_health') or {}
-        available = [k for k,v in probe.items() if v.get('ok')]
+        healthy = int(payload.get('healthy_providers') or sum(1 for v in probe.values() if v.get('ok')))
     except Exception as e:
         raise SystemExit(f'BLOCKED: invalid provider preflight result: {type(e).__name__}')
-    if not available:
-        raise SystemExit('BLOCKED: provider preflight passed no real K-line provider')
+    if payload.get('status') != 'PASS' or healthy < 1:
+        raise SystemExit('BLOCKED: provider preflight did not pass')
 
     market=scan_all()
     market_path=Path('data/market.json')
