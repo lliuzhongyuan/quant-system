@@ -110,8 +110,7 @@ def score_signal(s,rows):
     st=[]; why=[]
     def add(key,reason): st.append(key); why.append(reason)
     if p/low60<=1.35 and p<m20*1.25 and m5>=m10 and vr>=1.15 and ret20>-.05 and risk<20:add('A','60日低位+均线修复+量能启动')
-    prior20=max(c[-21:-1])
-    if prior20 and p>=prior20*.995 and p>m20 and m5>m10 and vr>=1.3 and (mh is None or mh>0):add('B','20日平台突破+趋势量能+MACD确认')
+    if max(c[-21:-1]) and p>=max(c[-21:-1])*.995 and p>m20 and m5>m10 and vr>=1.3 and (mh is None or mh>0):add('B','20日平台突破+趋势量能+MACD确认')
     if m5>m10>m20 and -.12<=dd20<=-.025 and p>=m10*.985 and vc<.9 and (rs is None or rs>45):add('C','主升趋势回踩+缩量+均线承接')
     if p>m20 and ret5>-.06 and vr>=1.1 and (s.get('turnover') or 0)>.5 and force>=55:add('D','量价成本代理+趋势承接（非真实筹码分布）')
     if (s.get('total_mv') or 0)>=100e8 and p>m20 and trend>=20 and (s.get('pe') is None or 0<s['pe']<=60):add('E','大市值+趋势质量+估值约束')
@@ -125,7 +124,7 @@ def score_signal(s,rows):
     provider=rows[-1].get('source','unknown') if rows else 'unknown'
     return {**s,'kline_source':provider,'kline_rows':len(rows),'ma5':round(m5,3),'ma10':round(m10,3),'ma20':round(m20,3),'ma60':round(m60,3),'rsi14':round(rs,2) if rs is not None else None,'macd_dif':round(dif,4) if dif is not None else None,'macd_dea':round(dea,4) if dea is not None else None,'macd_hist':round(mh,4) if mh is not None else None,'kdj_k':round(k,2),'kdj_d':round(d,2),'kdj_j':round(j,2),'atr14':round(a,3) if a else None,'volume_ratio_calc':round(vr,2),'main_force_proxy':force,'position60':round(pos,3),'return5d':round(ret5*100,2),'return20d':round(ret20*100,2),'drawdown20':round(dd20*100,2),'volume_contraction':round(vc,3),'trend_score':trend,'position_score':position,'momentum_score':momentum,'funds_score':funds,'basic_score':basic,'risk_deduction':risk,'quality_score':quality,'opportunity_score':opportunity,'strategy_keys':st,'strategy_names':[STRATEGIES[x] for x in st],'resonance_count':resonance,'tier':tier,'action_status':action,'signal_reason':'；'.join(why[:5]) or '暂无有效策略信号','target_price':round(target,2),'stop_loss':round(stop,2),'risk_reward':round((target-p)/risk_per,2),'signal_confidence':round(min(99,max(1,opportunity*.45+quality*.35+force*.20)),1),'signal_time':dt.datetime.now(dt.timezone.utc).isoformat(),'data_quality':'technical_real'}
 
-def scan_all(workers=12,kline_limit=180):
+def scan_all(workers=6,kline_limit=180):
     stocks=fetch_market(); indices=fetch_indices(); total=len(stocks); now=dt.datetime.now(dt.timezone.utc).isoformat()
     probe=source_probe('600519')
     write_json(DATA/'provider_health.json',{'checked_at':now,'probe_symbol':'600519','providers':probe,'healthy_providers':sum(1 for x in probe.values() if x.get('ok')),'data_quality':'real_provider_probe'})
