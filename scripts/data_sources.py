@@ -64,19 +64,29 @@ def load_cached(code,limit=180):
     except Exception: pass
     return []
 
+def _baostock_session():
+    bs=getattr(_thread,'bs',None)
+    if bs is None:
+        try:
+            import baostock as bs_mod
+            lg=bs_mod.login()
+            if lg.error_code!='0': return None
+            _thread.bs=bs_mod; bs=bs_mod
+        except Exception: return None
+    return bs
+
 def baostock_kline(code,limit=180):
     try:
-        import baostock as bs
-        lg=bs.login()
-        if lg.error_code!='0': return []
-        rs=bs.query_history_k_data_plus(f'{market(code)}.{code}','date,open,high,low,close,volume,amount','start_date=2024-01-01&end_date=2099-12-31&frequency=d&adjustflag=2')
+        bs=_baostock_session()
+        if bs is None:return []
+        end=dt.date.today().isoformat(); start=(dt.date.today()-dt.timedelta(days=420)).isoformat()
+        rs=bs.query_history_k_data_plus(f'{market(code)}.{code}','date,open,high,low,close,volume,amount',start_date=start,end_date=end,frequency='d',adjustflag='2')
         out=[]
         while rs.next():
             row=rs.get_row_data()
             if len(row)>=7 and row[0]:
                 try: out.append({'date':row[0],'open':float(row[1]),'high':float(row[2]),'low':float(row[3]),'close':float(row[4]),'volume':float(row[5] or 0),'amount':float(row[6] or 0),'source':'Baostock','fetched_at':stamp()})
                 except Exception: pass
-        bs.logout()
         return out[-limit:] if len(out)>=80 else []
     except Exception: return []
 
