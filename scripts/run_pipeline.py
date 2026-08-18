@@ -13,24 +13,27 @@ from walkforward import run as run_walkforward
 from sector_engine import run as run_sector
 from news_aggregator import run as run_news_aggregator
 from universe_snapshot import run as run_universe_snapshot
-from provider_probe import run as run_provider_probe
 
-# Production K-line policy: Tencent QFQ -> Tencent legacy QFQ -> Eastmoney QFQ -> Sina.
-# No synthetic/demo/stale fallback is permitted.
 engine.fetch_kline = robust_kline
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 
 def production():
-    # Refresh dynamic universe and provider health exactly once at the start of each production run.
+    # provider_probe.py already ran immediately before this script in the workflow.
+    # Reusing its result avoids a second network probe/rate-limit race.
     universe = run_universe_snapshot()
-    probe_payload = run_provider_probe()
-    probe = probe_payload.get('provider_health') or {}
-    available=[k for k,v in probe.items() if v.get('ok')]
+    probe_path = Path('data/provider_health.json')
+    if not probe_path.exists():
+        raise SystemExit('BLOCKED: provider preflight result is missing')
+    try:
+        payload = json.loads(probe_path.read_text(encoding='utf8'))
+        probe = payload.get('provider_health') or {}
+        available = [k for k,v in probe.items() if v.get('ok')]
+    except Exception as e:
+        raise SystemExit(f'BLOCKED: invalid provider preflight result: {type(e).__name__}')
     if not available:
-        raise SystemExit('BLOCKED: no real K-line provider passed the multi-symbol preflight')
+        raise SystemExit('BLOCKED: provider preflight passed no real K-line provider')
 
     market=scan_all()
-    # Attach the dynamic universe layers to the production snapshot before the quality gate.
     market_path=Path('data/market.json')
     if market_path.exists():
         market_obj=json.loads(market_path.read_text(encoding='utf8'))
@@ -57,8 +60,8 @@ def production():
 
     validate(True)
     run_sector()
-    update_news()          # legacy Sina fetch retained as a diagnostic source
-    run_news_aggregator()  # overwrite with verified multi-source news set
+    update_news()
+    run_news_aggregator()
     run_backtest()
     run_strategy_board()
     run_portfolio()
