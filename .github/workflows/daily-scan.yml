@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'scripts/data_sources.py'
+      - 'scripts/engine.py'
       - 'scripts/run_pipeline.py'
       - 'scripts/provider_probe.py'
       - 'scripts/universe_snapshot.py'
