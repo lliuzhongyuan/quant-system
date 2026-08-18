@@ -38,9 +38,7 @@ def _rows(arr,source):
 
 def _yahoo_rows(node):
     try:
-        ts=node.get('timestamp') or []
-        q=((node.get('indicators') or {}).get('quote') or [{}])[0]
-        out=[]
+        ts=node.get('timestamp') or []; q=((node.get('indicators') or {}).get('quote') or [{}])[0]; out=[]
         for i,t in enumerate(ts):
             vals=[q.get(k,[None]*len(ts))[i] if i<len(q.get(k,[])) else None for k in ('open','close','high','low','volume')]
             if any(v is None for v in vals[:4]): continue
@@ -49,8 +47,7 @@ def _yahoo_rows(node):
     except Exception: return []
 
 def yahoo_batch(codes,range_='1y',interval='1d',chunk=40):
-    result={}; codes=list(dict.fromkeys(str(c) for c in codes))
-    s=session()
+    result={}; codes=list(dict.fromkeys(str(c) for c in codes)); s=session()
     for i in range(0,len(codes),chunk):
         part=codes[i:i+chunk]; symbols=','.join(yahoo_symbol(c) for c in part)
         r=s.get(YAHOO_SPARK,params={'symbols':symbols,'range':range_,'interval':interval},timeout=20); r.raise_for_status(); obj=r.json()
@@ -66,6 +63,22 @@ def load_cached(code,limit=180):
         if isinstance(rows,list) and len(rows)>=80:return rows[-limit:]
     except Exception: pass
     return []
+
+def baostock_kline(code,limit=180):
+    try:
+        import baostock as bs
+        lg=bs.login()
+        if lg.error_code!='0': return []
+        rs=bs.query_history_k_data_plus(f'{market(code)}.{code}','date,open,high,low,close,volume,amount','start_date=2024-01-01&end_date=2099-12-31&frequency=d&adjustflag=2')
+        out=[]
+        while rs.next():
+            row=rs.get_row_data()
+            if len(row)>=7 and row[0]:
+                try: out.append({'date':row[0],'open':float(row[1]),'high':float(row[2]),'low':float(row[3]),'close':float(row[4]),'volume':float(row[5] or 0),'amount':float(row[6] or 0),'source':'Baostock','fetched_at':stamp()})
+                except Exception: pass
+        bs.logout()
+        return out[-limit:] if len(out)>=80 else []
+    except Exception: return []
 
 def tencent_quote(code):
     s=session(); sym=market(code)+str(code); r=s.get(TENCENT_Q+sym,timeout=8); r.raise_for_status(); txt=r.content.decode('gbk','ignore')
@@ -89,31 +102,28 @@ def eastmoney_kline(code,limit=180):
 def sina_kline(code,limit=180):
     s=session(); r=s.get(SINA_K,params={'symbol':market(code)+str(code),'scale':240,'ma':'5,10,20,60','datalen':limit},headers={'Referer':'https://finance.sina.com.cn/'},timeout=8); r.raise_for_status(); return _rows(r.json() or [],'Sina Finance')
 
-def yahoo_kline(code,limit=180):
-    return yahoo_batch([code],range_='1y',interval='1d',chunk=1).get(str(code),[])[-limit:]
+def yahoo_kline(code,limit=180): return yahoo_batch([code],range_='1y',interval='1d',chunk=1).get(str(code),[])[-limit:]
 
 def robust_kline(code,limit=180):
     cached=load_cached(code,limit)
     if cached:return cached
-    providers=[yahoo_kline,tencent_kline,tencent_legacy_kline,eastmoney_kline,sina_kline]
-    for fn in providers:
+    for fn in (baostock_kline,yahoo_kline,tencent_kline,tencent_legacy_kline,eastmoney_kline,sina_kline):
         try:
             rows=fn(code,limit)
             if len(rows)>=80:return rows
-        except Exception:continue
+        except Exception: continue
     return []
 
 def source_probe(code='600519'):
     cache=ROOT/'data'/'provider_health.json'
     try:
-        payload=json.loads(cache.read_text(encoding='utf-8')); cached=payload.get('provider_health') or payload.get('providers')
+        payload=json.loads(cache.read_text(encoding='utf8')); cached=payload.get('provider_health') or payload.get('providers')
         if isinstance(cached,dict) and cached:return cached
     except Exception:pass
     out={}
-    for name,fn in [('Yahoo Finance Batch',yahoo_kline),('Tencent QFQ',tencent_kline),('Tencent Legacy',tencent_legacy_kline),('Eastmoney QFQ',eastmoney_kline),('Sina',sina_kline)]:
-        try:
-            rows=fn(code,80); out[name]={'ok':len(rows)>=80,'rows':len(rows)}
-        except Exception as e:out[name]={'ok':False,'rows':0,'error':type(e).__name__}
+    for name,fn in [('Baostock',baostock_kline),('Yahoo Finance Batch',yahoo_kline),('Tencent QFQ',tencent_kline),('Tencent Legacy',tencent_legacy_kline),('Eastmoney QFQ',eastmoney_kline),('Sina',sina_kline)]:
+        try: rows=fn(code,80); out[name]={'ok':len(rows)>=80,'rows':len(rows)}
+        except Exception as e: out[name]={'ok':False,'rows':0,'error':type(e).__name__}
     return out
 
 def crosscheck(code,sina=None):
