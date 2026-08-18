@@ -112,3 +112,5 @@ def crosscheck(code,sina=None):
         diff=abs(tp-p)/max(abs(p),1e-9)
         return {'status':'pass' if diff<=.01 else 'mismatch','price_diff_pct':round(diff*100,4),'tencent':t}
     except Exception as e:return {'status':'error','error':type(e).__name__}
+
+# Trigger note: provider preflight is now multi-symbol and uncached in provider_probe.py.
