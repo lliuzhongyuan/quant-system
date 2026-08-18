@@ -6,7 +6,6 @@ on:
       - 'scripts/run_pipeline.py'
       - 'scripts/provider_probe.py'
       - 'scripts/universe_snapshot.py'
-      - 'scripts/batch_cache.py'
   schedule:
     - cron: '50 0 * * 1-5'
     - cron: '20 7 * * 1-5'
@@ -27,8 +26,6 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Build dynamic universe
         run: python scripts/universe_snapshot.py
-      - name: Warm free batch K-line cache
-        run: python scripts/batch_cache.py
       - name: Provider preflight
         run: python scripts/provider_probe.py
       - name: Run production pipeline
