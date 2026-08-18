@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'scripts/data_sources.py'
+      - 'scripts/run_pipeline.py'
   schedule:
     - cron: '50 0 * * 1-5'
     - cron: '20 7 * * 1-5'
