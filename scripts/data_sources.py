@@ -1,5 +1,7 @@
 import datetime as dt
 import threading
+import json
+from pathlib import Path
 import requests
 
 UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151 Safari/537.36'
@@ -73,7 +75,6 @@ def sina_kline(code,limit=180):
     return _rows(r.json() or [],'Sina Finance')
 
 def robust_kline(code,limit=180):
-    # Prefer independent real providers. A provider returning HTTP 200 + empty/short data is treated as failure.
     providers=[tencent_kline,tencent_legacy_kline,eastmoney_kline,sina_kline]
     for fn in providers:
         try:
@@ -85,6 +86,17 @@ def robust_kline(code,limit=180):
     return []
 
 def source_probe(code='600519'):
+    # The production workflow already performs the provider probe. Reuse that result
+    # inside the same run instead of probing all four endpoints a second time and
+    # potentially triggering provider throttling.
+    cache=Path(__file__).resolve().parents[1]/'data'/'provider_health.json'
+    try:
+        payload=json.loads(cache.read_text(encoding='utf-8'))
+        cached=payload.get('provider_health') or payload.get('providers')
+        if isinstance(cached,dict) and cached:
+            return cached
+    except Exception:
+        pass
     out={}
     for name,fn in [('Tencent QFQ',tencent_kline),('Tencent Legacy',tencent_legacy_kline),('Eastmoney QFQ',eastmoney_kline),('Sina',sina_kline)]:
         try:
