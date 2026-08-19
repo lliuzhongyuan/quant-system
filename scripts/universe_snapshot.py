@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import re
+import time
 from pathlib import Path
 import requests
 
@@ -10,11 +11,22 @@ def run():
     s=requests.Session(); s.headers.update({'User-Agent':UA,'Referer':'https://finance.sina.com.cn/'}); raw=[]; source_errors=[]
     for node in ('sh_a','sz_a'):
         for page in range(1,101):
-            try: rows=s.get(LIST_URL,params={'node':node,'page':page,'num':100,'sort':'symbol','asc':1},timeout=12).json() or []
-            except Exception as e: source_errors.append({'node':node,'page':page,'error':type(e).__name__}); break
+            rows=None; last_error=None
+            # Sina occasionally returns a transient non-JSON response on one
+            # page. Retry that page instead of truncating the whole universe.
+            for attempt in range(3):
+                try:
+                    rows=s.get(LIST_URL,params={'node':node,'page':page,'num':100,'sort':'symbol','asc':1},timeout=12).json() or []
+                    last_error=None; break
+                except Exception as e:
+                    last_error=type(e).__name__
+                    if attempt<2: time.sleep(.5*(attempt+1))
+            if last_error:
+                source_errors.append({'node':node,'page':page,'error':last_error,'attempts':3}); break
             if not rows: break
             raw.extend(rows)
             if len(rows)<100: break
+            time.sleep(.02)
     dedup={str(x.get('code')):x for x in raw if x.get('code')}; valid=[]; tradable=[]; excluded={'ST_or退':0,'停牌':0,'非目标板块':0,'代码无效':0}
     for code,item in dedup.items():
         name=str(item.get('name') or '')
