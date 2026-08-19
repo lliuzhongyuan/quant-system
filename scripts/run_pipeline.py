@@ -17,8 +17,23 @@ from universe_snapshot import run as run_universe_snapshot
 engine.fetch_kline = robust_kline
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 
+def load_valid_universe_snapshot():
+    p=Path('data/universe_stats.json')
+    if p.exists():
+        try:
+            x=json.loads(p.read_text(encoding='utf8'))
+            n=int(x.get('tradable_universe_count') or 0)
+            if n>=3000:
+                return x
+        except Exception:
+            pass
+    return run_universe_snapshot()
+
 def production():
-    universe = run_universe_snapshot()
+    # The workflow already builds the dynamic universe before entering the
+    # production pipeline. Reuse that verified snapshot instead of querying
+    # Sina a second time, which can hit a transient page/JSON failure.
+    universe = load_valid_universe_snapshot()
     probe_path = Path('data/provider_health.json')
     if not probe_path.exists():
         raise SystemExit('BLOCKED: provider preflight result is missing')
