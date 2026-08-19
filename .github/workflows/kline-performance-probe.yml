@@ -1,0 +1,31 @@
+name: K线免费源性能探针
+on:
+  push:
+    paths:
+      - 'scripts/kline_performance_probe.py'
+      - 'scripts/data_sources.py'
+      - 'data/universe_codes.json'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: quant-kline-probe
+  cancel-in-progress: true
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r requirements.txt
+      - name: Run bounded performance probe
+        run: python scripts/kline_performance_probe.py
+      - name: Save probe result
+        run: |
+          git config user.name 'quant-bot'
+          git config user.email 'quant-bot@users.noreply.github.com'
+          git add data/kline_performance_probe.json
+          git diff --cached --quiet || git commit -m 'data: kline provider performance probe'
+          git push
