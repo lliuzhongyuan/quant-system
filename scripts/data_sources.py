@@ -118,8 +118,9 @@ def yahoo_kline(code,limit=180): return yahoo_batch([code],range_='1y',interval=
 def robust_kline(code,limit=180):
     cached=load_cached(code,limit)
     if cached:return cached
-    # Yahoo single-symbol Spark is currently the only source proven 3/3 from the free-source probe.
-    for fn in (yahoo_kline,baostock_kline,tencent_kline,tencent_legacy_kline,eastmoney_kline,sina_kline):
+    # Current verified free providers: Baostock and Eastmoney. Prefer Baostock,
+    # then Eastmoney; keep other public endpoints as fallbacks only.
+    for fn in (baostock_kline,eastmoney_kline,yahoo_kline,tencent_kline,tencent_legacy_kline,sina_kline):
         try:
             rows=fn(code,limit)
             if len(rows)>=80:return rows
