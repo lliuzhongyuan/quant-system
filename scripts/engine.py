@@ -29,8 +29,15 @@ def fetch_market():
     raw=[]
     for node in ('sh_a','sz_a'):
         for page in range(1,101):
-            try: rows=S.get(LIST_URL,params={'node':node,'page':page,'num':100,'sort':'symbol','asc':1},timeout=12).json() or []
-            except Exception: break
+            rows=None; last_error=None
+            for attempt in range(3):
+                try:
+                    rows=S.get(LIST_URL,params={'node':node,'page':page,'num':100,'sort':'symbol','asc':1},timeout=12).json() or []
+                    last_error=None; break
+                except Exception as e:
+                    last_error=type(e).__name__
+                    if attempt<2: time.sleep(.5*(attempt+1))
+            if last_error: break
             if not rows: break
             raw.extend(rows)
             if len(rows)<100: break
@@ -126,6 +133,8 @@ def score_signal(s,rows):
 
 def scan_all(workers=6,kline_limit=180):
     stocks=fetch_market(); indices=fetch_indices(); total=len(stocks); now=dt.datetime.now(dt.timezone.utc).isoformat()
+    if total<3000:
+        raise RuntimeError(f'Dynamic A-share universe incomplete: {total}; refusing partial production scan')
     probe=source_probe('600519')
     write_json(DATA/'provider_health.json',{'checked_at':now,'probe_symbol':'600519','providers':probe,'healthy_providers':sum(1 for x in probe.values() if x.get('ok')),'data_quality':'real_provider_probe'})
     if not any(x.get('ok') for x in probe.values()):
