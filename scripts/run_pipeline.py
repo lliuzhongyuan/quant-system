@@ -3,6 +3,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import engine
 from data_sources import robust_kline
+from index_sources import fetch_indices
 from engine import scan_all, update_news
 from backtest import run as run_backtest
 from data_quality import validate
@@ -15,6 +16,7 @@ from news_aggregator import run as run_news_aggregator
 from universe_snapshot import run as run_universe_snapshot
 
 engine.fetch_kline = robust_kline
+engine.fetch_indices = fetch_indices
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 
 def load_valid_universe_snapshot():
@@ -83,6 +85,16 @@ def production():
     if payload.get('status') != 'PASS' or healthy < 1:
         raise SystemExit('BLOCKED: provider preflight did not pass')
 
+    index_health_path=Path('data/index_provider_health.json')
+    if not index_health_path.exists():
+        raise SystemExit('BLOCKED: index provider preflight result is missing')
+    try:
+        index_health=json.loads(index_health_path.read_text(encoding='utf8'))
+    except Exception as e:
+        raise SystemExit(f'BLOCKED: invalid index provider preflight result: {type(e).__name__}')
+    if index_health.get('status') != 'PASS' or int(index_health.get('healthy') or 0) < 4:
+        raise SystemExit('BLOCKED: index provider preflight did not pass all 4 major indexes')
+
     verified_market=load_verified_market()
     if len(verified_market) < int(universe.get('tradable_universe_count') or 0) * .9:
         raise SystemExit(f"BLOCKED: verified market snapshot coverage too low: {len(verified_market)}/{universe.get('tradable_universe_count')}")
@@ -105,6 +117,5 @@ def production():
 
 if mode=='news': run_news_aggregator()
 elif mode=='scan': production()
-elif mode=='backtest': run_backtest()
 elif mode in ('all','daily'): production()
 else: raise SystemExit(f'unknown mode: {mode}')
