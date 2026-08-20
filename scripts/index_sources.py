@@ -77,23 +77,31 @@ def fetch_indices():
         rows=get_index(code,260)
         if quote is None and rows:
             last=rows[-1]; prev=rows[-2]['close'] if len(rows)>1 else None; ch=(last['close']-prev) if prev else None
-            quote={'code':code,'name':INDEXES[code]['name'],'price':last['close'],'prev_close':prev,'change':ch,'change_pct':ch/prev*100 if prev else None,'source':last['source']}
+            quote={'code':code,'name':INDEXES[code]['name'],'price':last['close'],'prev_close':prev,'change':ch,'change_pct':ch/prev*100 if prev else None,'source':last['source'],'fetched_at':dt.datetime.now(dt.timezone.utc).isoformat()}
         if quote:
-            quote['kline_rows']=len(rows); quote['kline_source']=rows[-1].get('source') if rows else None; out.append(quote)
+            quote['kline_rows']=len(rows); quote['kline_source']=rows[-1].get('source') if rows else None; quote['kline_latest']=rows[-1].get('date') if rows else None; out.append(quote)
     return out
 
 def probe():
     result={}
+    today=dt.date.today()
     for code,meta in INDEXES.items():
-        item={'name':meta['name'],'eastmoney_kline':0,'baostock_kline':0,'quote_ok':False}
-        try:item['eastmoney_kline']=len(eastmoney_index(code,80))
-        except Exception:pass
+        item={'name':meta['name'],'eastmoney_kline':0,'baostock_kline':0,'quote_ok':False,'latest_date':None}
+        try:
+            er=eastmoney_index(code,80); item['eastmoney_kline']=len(er); item['latest_date']=er[-1]['date'] if er else None
+        except Exception: pass
         if item['eastmoney_kline']<60:
-            try:item['baostock_kline']=len(baostock_index(code,80))
-            except Exception:pass
+            try:
+                br=baostock_index(code,80); item['baostock_kline']=len(br); item['latest_date']=br[-1]['date'] if br else item['latest_date']
+            except Exception: pass
         try:item['quote_ok']=eastmoney_quote(code).get('price') is not None
-        except Exception:pass
-        item['ok']=item['quote_ok'] and (item['eastmoney_kline']>=60 or item['baostock_kline']>=60)
+        except Exception: pass
+        fresh=False
+        if item['latest_date']:
+            try:fresh=(today-dt.date.fromisoformat(item['latest_date'])).days<=7
+            except Exception: pass
+        item['fresh_enough']=fresh
+        item['ok']=item['quote_ok'] and (item['eastmoney_kline']>=60 or item['baostock_kline']>=60) and fresh
         result[code]=item
     ok=sum(1 for x in result.values() if x['ok'])
     payload={'status':'PASS' if ok==len(result) else 'FAIL','healthy':ok,'total':len(result),'indexes':result,'checked_at':dt.datetime.now(dt.timezone.utc).isoformat()}
