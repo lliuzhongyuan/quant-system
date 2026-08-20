@@ -60,13 +60,9 @@ def load_verified_market():
         mv=num(x.get('mktcap')); nmc=num(x.get('nmc'))
         out.append({'code':code+('.SH' if exchange(code)=='sh' else '.SZ'),'symbol':code,'name':name,
                     'price':num(x.get('trade')),'change_pct':num(x.get('changepercent'),0),
-                    'change':num(x.get('pricechange'),0),'volume':num(x.get('volume'),0),
-                    'amount':num(x.get('amount'),0),'turnover':num(x.get('turnoverratio'),0),
-                    'pe':num(x.get('per')),'pb':num(x.get('pb')),'high':num(x.get('high')),
-                    'low':num(x.get('low')),'open':num(x.get('open')),
-                    'prev_close':num(x.get('settlement')),
-                    'total_mv':mv*10000 if mv is not None else None,
-                    'float_mv':nmc*10000 if nmc is not None else None,'sector':'未分类'})
+                    'change':num(x.get('pricechange'),0),'volume':num(x.get('volume'),0),'amount':num(x.get('amount'),0),'turnover':num(x.get('turnoverratio'),0),
+                    'pe':num(x.get('per')),'pb':num(x.get('pb')),'high':num(x.get('high')),'low':num(x.get('low')),'open':num(x.get('open')),
+                    'prev_close':num(x.get('settlement')),'total_mv':mv*10000 if mv is not None else None,'float_mv':nmc*10000 if nmc is not None else None,'sector':'未分类'})
     if len(out) < 3000:
         raise SystemExit(f'BLOCKED: verified market snapshot converted to only {len(out)} stocks')
     return out
@@ -74,26 +70,29 @@ def load_verified_market():
 def production():
     universe = load_valid_universe_snapshot()
     probe_path = Path('data/provider_health.json')
-    if not probe_path.exists():
-        raise SystemExit('BLOCKED: provider preflight result is missing')
+    if not probe_path.exists(): raise SystemExit('BLOCKED: provider preflight result is missing')
     try:
         payload = json.loads(probe_path.read_text(encoding='utf8'))
         probe = payload.get('provider_health') or {}
         healthy = int(payload.get('healthy_providers') or sum(1 for v in probe.values() if v.get('ok')))
-    except Exception as e:
-        raise SystemExit(f'BLOCKED: invalid provider preflight result: {type(e).__name__}')
-    if payload.get('status') != 'PASS' or healthy < 1:
-        raise SystemExit('BLOCKED: provider preflight did not pass')
+    except Exception as e: raise SystemExit(f'BLOCKED: invalid provider preflight result: {type(e).__name__}')
+    if payload.get('status') != 'PASS' or healthy < 1: raise SystemExit('BLOCKED: provider preflight did not pass')
 
     index_health_path=Path('data/index_provider_health.json')
-    if not index_health_path.exists():
-        raise SystemExit('BLOCKED: index provider preflight result is missing')
-    try:
-        index_health=json.loads(index_health_path.read_text(encoding='utf8'))
-    except Exception as e:
-        raise SystemExit(f'BLOCKED: invalid index provider preflight result: {type(e).__name__}')
-    if index_health.get('status') != 'PASS' or int(index_health.get('healthy') or 0) < 4:
-        raise SystemExit('BLOCKED: index provider preflight did not pass all 4 major indexes')
+    if not index_health_path.exists(): raise SystemExit('BLOCKED: index provider preflight result is missing')
+    try: index_health=json.loads(index_health_path.read_text(encoding='utf8'))
+    except Exception as e: raise SystemExit(f'BLOCKED: invalid index provider preflight result: {type(e).__name__}')
+    if index_health.get('status') != 'PASS' or int(index_health.get('healthy') or 0) < 4: raise SystemExit('BLOCKED: index provider preflight did not pass all 4 major indexes')
+
+    verified_indices=fetch_indices()
+    expected={'sh000001','sz399001','sz399006','sh000300'}
+    actual={str(x.get('code')) for x in verified_indices if x.get('code')}
+    if actual != expected or len(verified_indices) != 4:
+        raise SystemExit(f'BLOCKED: verified index snapshot incomplete: {sorted(actual)}')
+    if any(x.get('price') is None or x.get('change_pct') is None or x.get('kline_rows',0) < 60 for x in verified_indices):
+        raise SystemExit('BLOCKED: verified index snapshot contains incomplete quote/K-line data')
+    # Freeze the exact four-index snapshot for this production run.
+    engine.fetch_indices=lambda: verified_indices
 
     verified_market=load_verified_market()
     if len(verified_market) < int(universe.get('tradable_universe_count') or 0) * .9:
@@ -104,7 +103,7 @@ def production():
     market_path=Path('data/market.json')
     if market_path.exists():
         market_obj=json.loads(market_path.read_text(encoding='utf8'))
-        market_obj.update({'universe_raw': universe.get('raw_count', 0),'universe_unique': universe.get('unique_count', 0),'universe_valid_codes': universe.get('valid_code_count', 0),'tradable_universe': universe.get('tradable_universe_count', 0),'universe_excluded': universe.get('excluded', {}),'coverage_denominator': universe.get('tradable_universe_count', 0),'coverage_definition': 'scanned / dynamic tradable universe'})
+        market_obj.update({'universe_raw': universe.get('raw_count', 0),'universe_unique': universe.get('unique_count', 0),'universe_valid_codes': universe.get('valid_code_count', 0),'tradable_universe': universe.get('tradable_universe_count', 0),'universe_excluded': universe.get('excluded', {}),'coverage_denominator': universe.get('tradable_universe_count', 0),'coverage_definition': 'scanned / dynamic tradable universe','verified_index_snapshot':verified_indices})
         market_path.write_text(json.dumps(market_obj,ensure_ascii=False,separators=(',',':')),encoding='utf8')
     signals_path=Path('data/signals.json')
     if signals_path.exists():
