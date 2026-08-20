@@ -13,6 +13,10 @@ QUOTE_URL='https://hq.sinajs.cn/list='; NEWS_URL='https://finance.sina.com.cn/7x
 RETRY=Retry(total=2,connect=2,read=2,status=2,backoff_factor=.35,status_forcelist=(429,500,502,503,504),allowed_methods=frozenset(['GET']))
 S=requests.Session(); S.mount('https://',HTTPAdapter(max_retries=RETRY)); S.headers.update({'User-Agent':UA,'Referer':'https://finance.sina.com.cn/'})
 STRATEGIES={'A':'低位启动','B':'主升突破','C':'回踩二波','D':'筹码结构穿透','E':'龙头强度','F':'超跌反转','G':'量价异动','H':'风险拦截'}
+# Production pipeline can inject a verified K-line provider at runtime.
+# Keeping an explicit function reference prevents the scanner from silently bypassing it.
+fetch_kline=robust_kline
+
 
 def num(x,default=None):
     try:
@@ -144,7 +148,7 @@ def scan_all(workers=6,kline_limit=180):
     write_json(DATA/'scan_status.json',{'status':'running','started_at':now,'universe':total,'scanned':0,'failed':0,'progress':0})
     results=[]; failed=0
     def one(s):
-        rows=robust_kline(s['symbol'],kline_limit); return score_signal(s,rows),rows
+        rows=fetch_kline(s['symbol'],kline_limit); return score_signal(s,rows),rows
     with ThreadPoolExecutor(max_workers=workers) as ex:
         fs={ex.submit(one,s):s for s in stocks}
         for i,f in enumerate(as_completed(fs),1):
@@ -154,6 +158,10 @@ def scan_all(workers=6,kline_limit=180):
                 else: failed+=1
             except Exception: failed+=1
             if i%100==0 or i==total: write_json(DATA/'scan_status.json',{'status':'running','started_at':now,'universe':total,'scanned':i,'failed':failed,'progress':round(i/max(1,total)*100,1)})
+    coverage=len(results)/max(1,total)
+    if coverage<.90:
+        write_json(DATA/'scan_status.json',{'status':'blocked','reason':'kline_scan_coverage_below_90pct','universe':total,'successful':len(results),'failed':failed,'coverage_pct':round(coverage*100,2),'progress':100})
+        raise RuntimeError(f'K-line scan coverage too low: {len(results)}/{total} ({coverage*100:.2f}%), production scan blocked')
     results.sort(key=lambda x:(x[0]['tier']=='D',-x[0]['resonance_count'],-x[0]['opportunity_score'],-x[0]['quality_score']))
     signals=[x[0] for x in results]; qualified=[x for x in results if x[0]['tier'] in ('S','A','B')]; keep=sorted(qualified,key=lambda x:(-x[0]['opportunity_score'],-x[0]['quality_score']))[:600]; keep_names={x[0]['symbol']+'.json' for x in keep}
     for p in STOCKS.glob('*.json'):
@@ -161,9 +169,9 @@ def scan_all(workers=6,kline_limit=180):
     for q,rows in keep: write_json(STOCKS/(q['symbol']+'.json'),{'stock':q,'klines':rows})
     rg=regime(indices,breadth); source_counts={}
     for q in signals: source_counts[q.get('kline_source','unknown')]=source_counts.get(q.get('kline_source','unknown'),0)+1
-    market_obj={'updated_at':now,'source':'Sina A-share list + multi-source daily K-line','universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(len(signals)/max(1,total)*100,2),'kline_source_counts':source_counts,'indices':indices,'breadth':breadth,'regime':rg,'data_quality':'real_market_and_multi_source_daily_technical'}
-    write_json(DATA/'market.json',market_obj); write_json(DATA/'signals.json',{'updated_at':now,'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(len(signals)/max(1,total)*100,2),'items':signals,'strategy_catalog':STRATEGIES,'methodology':'A-H multi-factor technical engine; D is a cost/volume proxy, not true chip distribution.'})
-    write_json(DATA/'scan_status.json',{'status':'success','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(len(signals)/max(1,total)*100,2),'progress':100})
+    market_obj={'updated_at':now,'source':'Sina A-share list + multi-source daily K-line','universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'kline_source_counts':source_counts,'indices':indices,'breadth':breadth,'regime':rg,'data_quality':'real_market_and_multi_source_daily_technical'}
+    write_json(DATA/'market.json',market_obj); write_json(DATA/'signals.json',{'updated_at':now,'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'items':signals,'strategy_catalog':STRATEGIES,'methodology':'A-H multi-factor technical engine; D is a cost/volume proxy, not true chip distribution.'})
+    write_json(DATA/'scan_status.json',{'status':'success','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'progress':100})
     return market_obj
 
 def update_news():
