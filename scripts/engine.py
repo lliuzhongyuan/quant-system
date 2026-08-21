@@ -9,14 +9,11 @@ from data_sources import robust_kline, source_probe
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'; STOCKS=DATA/'stocks'; STOCKS.mkdir(parents=True,exist_ok=True)
 UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151 Safari/537.36'
 LIST_URL='https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData'
-QUOTE_URL='https://hq.sinajs.cn/list='; NEWS_URL='https://finance.sina.com.cn/7x24/notification.shtml'
+NEWS_URL='https://finance.sina.com.cn/7x24/notification.shtml'
 RETRY=Retry(total=2,connect=2,read=2,status=2,backoff_factor=.35,status_forcelist=(429,500,502,503,504),allowed_methods=frozenset(['GET']))
 S=requests.Session(); S.mount('https://',HTTPAdapter(max_retries=RETRY)); S.headers.update({'User-Agent':UA,'Referer':'https://finance.sina.com.cn/'})
 STRATEGIES={'A':'低位启动','B':'主升突破','C':'回踩二波','D':'筹码结构穿透','E':'龙头强度','F':'超跌反转','G':'量价异动','H':'风险拦截'}
-# Production pipeline can inject a verified K-line provider at runtime.
-# Keeping an explicit function reference prevents the scanner from silently bypassing it.
 fetch_kline=robust_kline
-
 
 def num(x,default=None):
     try:
@@ -55,15 +52,11 @@ def fetch_market():
     return out
 
 def fetch_indices():
-    try:
-        text=S.get(QUOTE_URL+'sh000001,sz399001,sz399006,sh000300',timeout=8).content.decode('gbk','ignore'); out=[]
-        for line in text.splitlines():
-            m=re.search(r'hq_str_([a-z0-9]+)=\"([^\"]*)\"',line,re.I)
-            if not m: continue
-            p=m.group(2).split(','); prev=num(p[2]) if len(p)>2 else None; ch=num(p[3],0) if len(p)>3 else 0
-            out.append({'code':m.group(1),'name':p[0],'price':num(p[1]),'change':ch,'change_pct':ch/prev*100 if prev else None})
-        return out
-    except Exception:return []
+    """Legacy index endpoint intentionally disabled.
+    Production must inject index_sources.fetch_indices, so an old Sina quote call
+    can never silently re-enter the production path.
+    """
+    raise RuntimeError('Legacy index provider disabled; production must inject index_sources.fetch_indices')
 
 def regime(indices,breadth):
     vals=[x['change_pct'] for x in indices if x.get('change_pct') is not None]; avg=sum(vals)/len(vals) if vals else 0
@@ -137,41 +130,33 @@ def score_signal(s,rows):
 
 def scan_all(workers=6,kline_limit=180):
     stocks=fetch_market(); indices=fetch_indices(); total=len(stocks); now=dt.datetime.now(dt.timezone.utc).isoformat()
-    if total<3000:
-        raise RuntimeError(f'Dynamic A-share universe incomplete: {total}; refusing partial production scan')
+    if total<3000: raise RuntimeError(f'Dynamic A-share universe incomplete: {total}; refusing partial production scan')
+    if len(indices)!=4 or any(x.get('price') is None or x.get('change_pct') is None for x in indices): raise RuntimeError('Index snapshot incomplete: production scan requires 4 verified major indexes')
     probe=source_probe('600519')
     write_json(DATA/'provider_health.json',{'checked_at':now,'probe_symbol':'600519','providers':probe,'healthy_providers':sum(1 for x in probe.values() if x.get('ok')),'data_quality':'real_provider_probe'})
-    if not any(x.get('ok') for x in probe.values()):
-        write_json(DATA/'scan_status.json',{'status':'blocked','reason':'all_kline_providers_unavailable','universe':total,'scanned':0,'failed':total,'progress':0})
-        raise RuntimeError('All K-line providers unavailable')
+    if not any(x.get('ok') for x in probe.values()): raise RuntimeError('All K-line providers unavailable')
     breadth={'advancers':sum(x['change_pct']>0 for x in stocks),'decliners':sum(x['change_pct']<0 for x in stocks),'flat':sum(x['change_pct']==0 for x in stocks),'limit_up':sum(x['change_pct']>=9.5 for x in stocks),'limit_down':sum(x['change_pct']<=-9.5 for x in stocks)}
     write_json(DATA/'scan_status.json',{'status':'running','started_at':now,'universe':total,'scanned':0,'failed':0,'progress':0})
     results=[]; failed=0
-    def one(s):
-        rows=fetch_kline(s['symbol'],kline_limit); return score_signal(s,rows),rows
+    def one(s): rows=fetch_kline(s['symbol'],kline_limit); return score_signal(s,rows),rows
     with ThreadPoolExecutor(max_workers=workers) as ex:
         fs={ex.submit(one,s):s for s in stocks}
         for i,f in enumerate(as_completed(fs),1):
             try:
-                q,rows=f.result()
-                if q: results.append((q,rows))
-                else: failed+=1
+                q,rows=f.result(); results.append((q,rows)) if q else None; failed+=0 if q else 1
             except Exception: failed+=1
             if i%100==0 or i==total: write_json(DATA/'scan_status.json',{'status':'running','started_at':now,'universe':total,'scanned':i,'failed':failed,'progress':round(i/max(1,total)*100,1)})
     coverage=len(results)/max(1,total)
-    if coverage<.90:
-        write_json(DATA/'scan_status.json',{'status':'blocked','reason':'kline_scan_coverage_below_90pct','universe':total,'successful':len(results),'failed':failed,'coverage_pct':round(coverage*100,2),'progress':100})
-        raise RuntimeError(f'K-line scan coverage too low: {len(results)}/{total} ({coverage*100:.2f}%), production scan blocked')
+    if coverage<.90: write_json(DATA/'scan_status.json',{'status':'blocked','reason':'kline_scan_coverage_below_90pct','universe':total,'successful':len(results),'failed':failed,'coverage_pct':round(coverage*100,2),'progress':100}); raise RuntimeError(f'K-line scan coverage too low: {len(results)}/{total} ({coverage*100:.2f}%), production scan blocked')
     results.sort(key=lambda x:(x[0]['tier']=='D',-x[0]['resonance_count'],-x[0]['opportunity_score'],-x[0]['quality_score']))
     signals=[x[0] for x in results]; qualified=[x for x in results if x[0]['tier'] in ('S','A','B')]; keep=sorted(qualified,key=lambda x:(-x[0]['opportunity_score'],-x[0]['quality_score']))[:600]; keep_names={x[0]['symbol']+'.json' for x in keep}
     for p in STOCKS.glob('*.json'):
-        if p.name not in keep_names: p.unlink(missing_ok=True)
+        if p.name not in keep_names:p.unlink(missing_ok=True)
     for q,rows in keep: write_json(STOCKS/(q['symbol']+'.json'),{'stock':q,'klines':rows})
     rg=regime(indices,breadth); source_counts={}
     for q in signals: source_counts[q.get('kline_source','unknown')]=source_counts.get(q.get('kline_source','unknown'),0)+1
-    market_obj={'updated_at':now,'source':'Sina A-share list + multi-source daily K-line','universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'kline_source_counts':source_counts,'indices':indices,'breadth':breadth,'regime':rg,'data_quality':'real_market_and_multi_source_daily_technical'}
-    write_json(DATA/'market.json',market_obj); write_json(DATA/'signals.json',{'updated_at':now,'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'items':signals,'strategy_catalog':STRATEGIES,'methodology':'A-H multi-factor technical engine; D is a cost/volume proxy, not true chip distribution.'})
-    write_json(DATA/'scan_status.json',{'status':'success','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'progress':100})
+    market_obj={'updated_at':now,'source':'verified 4-index snapshot + multi-source daily K-line','universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'kline_source_counts':source_counts,'indices':indices,'breadth':breadth,'regime':rg,'data_quality':'real_market_and_multi_source_daily_technical'}
+    write_json(DATA/'market.json',market_obj); write_json(DATA/'signals.json',{'updated_at':now,'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'items':signals,'strategy_catalog':STRATEGIES,'methodology':'A-H multi-factor technical engine; D is a cost/volume proxy, not true chip distribution.'}); write_json(DATA/'scan_status.json',{'status':'success','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'universe':total,'scanned':len(signals),'failed':failed,'coverage_pct':round(coverage*100,2),'progress':100})
     return market_obj
 
 def update_news():
@@ -181,9 +166,9 @@ def update_news():
         for m in re.finditer(r'<a[^>]+href=[\'\"]([^\'\"]+)[\'\"][^>]*>(.*?)</a>',html,re.I|re.S):
             title=re.sub(r'<[^>]+>','',m.group(2)); title=re.sub(r'\s+',' ',title).strip(); href=m.group(1)
             if 8<=len(title)<=120 and ('finance.sina.com.cn' in href or href.startswith('/')):
-                if title not in {x['title'] for x in items}: items.append({'title':title,'url':href if href.startswith('http') else 'https://finance.sina.com.cn'+href,'source':'Sina Finance 7x24','time':now})
-            if len(items)>=30: break
-    except Exception: pass
+                if title not in {x['title'] for x in items}:items.append({'title':title,'url':href if href.startswith('http') else 'https://finance.sina.com.cn'+href,'source':'Sina Finance 7x24','time':now})
+            if len(items)>=30:break
+    except Exception:pass
     write_json(DATA/'news.json',{'updated_at':now,'source':'Sina Finance 7x24','items':items,'count':len(items),'data_quality':'verified_web_fetch_only'}); return items
 
 if __name__=='__main__': scan_all(); update_news()
