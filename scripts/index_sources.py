@@ -93,16 +93,16 @@ def fetch_indices():
         rows=get_index(code,260)
         if quote is None and rows:
             last=rows[-1]; prev=rows[-2]['close'] if len(rows)>1 else None; ch=(last['close']-prev) if prev else None
-            quote={'code':code,'name':INDEXES[code]['name'],'price':last['close'],'prev_close':prev,'change':ch,'change_pct':ch/prev*100 if prev else None,'source':last['source'],'fetched_at':dt.datetime.now(dt.timezone.utc).isoformat()}
+            quote={'code':code,'name':INDEXES[code]['name'],'price':last['close'],'prev_close':prev,'change':ch,'change_pct':ch/prev*100 if prev else None,'source':last['source']+' Latest Close','fetched_at':dt.datetime.now(dt.timezone.utc).isoformat()}
         if quote:
-            quote['kline_rows']=len(rows); quote['kline_source']=rows[-1].get('source') if rows else None; quote['kline_latest']=rows[-1].get('date') if rows else None; out.append(quote)
+            quote['kline_rows']=len(rows); quote['kline_source']=rows[-1].get('source') if rows else None; quote['kline_latest']=rows[-1].get('date') if rows else None; quote['live_quote']=quote.get('source','').endswith('Quote'); out.append(quote)
     return out
 
 def probe():
     result={}
     today=dt.date.today()
     for code,meta in INDEXES.items():
-        item={'name':meta['name'],'eastmoney_kline':0,'baostock_kline':0,'quote_ok':False,'quote_source':None,'latest_date':None}
+        item={'name':meta['name'],'eastmoney_kline':0,'baostock_kline':0,'quote_ok':False,'quote_source':None,'latest_date':None,'live_quote_available':False}
         try:
             er=eastmoney_index(code,80); item['eastmoney_kline']=len(er); item['latest_date']=er[-1]['date'] if er else None
         except Exception: pass
@@ -114,16 +114,21 @@ def probe():
             try:
                 q=qfn(code)
                 if q and q.get('price') is not None:
-                    item['quote_ok']=True; item['quote_source']=q.get('source'); item['quote']=q; break
+                    item['quote_ok']=True; item['live_quote_available']=True; item['quote_source']=q.get('source'); item['quote']=q; break
             except Exception: pass
         fresh=False
         if item['latest_date']:
             try:fresh=(today-dt.date.fromisoformat(item['latest_date'])).days<=7
             except Exception: pass
         item['fresh_enough']=fresh
-        item['ok']=item['quote_ok'] and (item['eastmoney_kline']>=60 or item['baostock_kline']>=60) and fresh
+        kline_ok=(item['eastmoney_kline']>=60 or item['baostock_kline']>=60)
+        # EOD production depends on fresh daily index K-lines. Live quotes are reported separately
+        # and must never be fabricated or silently relabeled as real-time.
+        item['ok']=kline_ok and fresh
+        item['acceptance_mode']='fresh_daily_kline' if item['ok'] and not item['live_quote_available'] else ('live_quote_plus_kline' if item['ok'] else 'failed')
         result[code]=item
     ok=sum(1 for x in result.values() if x['ok'])
-    payload={'status':'PASS' if ok==len(result) else 'FAIL','healthy':ok,'total':len(result),'indexes':result,'checked_at':dt.datetime.now(dt.timezone.utc).isoformat()}
+    live=sum(1 for x in result.values() if x['live_quote_available'])
+    payload={'status':'PASS' if ok==len(result) else 'FAIL','healthy':ok,'total':len(result),'live_quote_available':live,'indexes':result,'checked_at':dt.datetime.now(dt.timezone.utc).isoformat(),'policy':'EOD scan accepts fresh real daily index K-lines when live quote providers are unreachable; live status remains explicitly unavailable.'}
     (ROOT/'data'/'index_provider_health.json').write_text(json.dumps(payload,ensure_ascii=False,indent=2),encoding='utf-8')
     return payload
