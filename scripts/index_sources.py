@@ -6,12 +6,13 @@ import requests
 UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151 Safari/537.36'
 EAST_K='https://push2his.eastmoney.com/api/qt/stock/kline/get'
 EAST_Q='https://push2.eastmoney.com/api/qt/stock/get'
+TENCENT_Q='https://qt.gtimg.cn/q='
 ROOT=Path(__file__).resolve().parents[1]
 INDEXES={
-    'sh000001':{'name':'上证指数','secid':'1.000001','bs':'sh.000001'},
-    'sz399001':{'name':'深证成指','secid':'0.399001','bs':'sz.399001'},
-    'sz399006':{'name':'创业板指','secid':'0.399006','bs':'sz.399006'},
-    'sh000300':{'name':'沪深300','secid':'1.000300','bs':'sh.000300'},
+    'sh000001':{'name':'上证指数','secid':'1.000001','bs':'sh.000001','tencent':'sh000001'},
+    'sz399001':{'name':'深证成指','secid':'0.399001','bs':'sz.399001','tencent':'sz399001'},
+    'sz399006':{'name':'创业板指','secid':'0.399006','bs':'sz.399006','tencent':'sz399006'},
+    'sh000300':{'name':'沪深300','secid':'1.000300','bs':'sh.000300','tencent':'sh000300'},
 }
 
 def _session():
@@ -43,6 +44,18 @@ def eastmoney_quote(code):
         except Exception:return None
     return {'code':code,'name':meta['name'],'price':n(price),'prev_close':n(prev),'change':n(change),'change_pct':n(pct),'source':'Eastmoney Index Quote','fetched_at':dt.datetime.now(dt.timezone.utc).isoformat()}
 
+def tencent_index_quote(code):
+    meta=INDEXES[code]; s=_session(); r=s.get(TENCENT_Q+meta['tencent'],timeout=8); r.raise_for_status(); text=r.content.decode('gbk','ignore')
+    if '=\"' not in text:return None
+    body=text.split('=\"',1)[1].rsplit('\"',1)[0]; f=body.split('~')
+    if len(f)<35:return None
+    def n(i):
+        try:return float(f[i])
+        except Exception:return None
+    price=n(3); prev=n(4)
+    if price is None:return None
+    return {'code':code,'name':f[1] or meta['name'],'price':price,'prev_close':prev,'change':price-prev if prev is not None else None,'change_pct':((price-prev)/prev*100 if prev else None),'high':n(33),'low':n(34),'quote_time':f[30] if len(f)>30 else None,'source':'Tencent Index Quote','fetched_at':dt.datetime.now(dt.timezone.utc).isoformat()}
+
 def baostock_index(code,limit=260):
     try:
         import baostock as bs
@@ -72,8 +85,11 @@ def fetch_indices():
     out=[]
     for code in INDEXES:
         quote=None
-        try: quote=eastmoney_quote(code)
-        except Exception: pass
+        for qfn in (eastmoney_quote,tencent_index_quote):
+            try:
+                quote=qfn(code)
+                if quote and quote.get('price') is not None:break
+            except Exception: pass
         rows=get_index(code,260)
         if quote is None and rows:
             last=rows[-1]; prev=rows[-2]['close'] if len(rows)>1 else None; ch=(last['close']-prev) if prev else None
@@ -86,7 +102,7 @@ def probe():
     result={}
     today=dt.date.today()
     for code,meta in INDEXES.items():
-        item={'name':meta['name'],'eastmoney_kline':0,'baostock_kline':0,'quote_ok':False,'latest_date':None}
+        item={'name':meta['name'],'eastmoney_kline':0,'baostock_kline':0,'quote_ok':False,'quote_source':None,'latest_date':None}
         try:
             er=eastmoney_index(code,80); item['eastmoney_kline']=len(er); item['latest_date']=er[-1]['date'] if er else None
         except Exception: pass
@@ -94,8 +110,12 @@ def probe():
             try:
                 br=baostock_index(code,80); item['baostock_kline']=len(br); item['latest_date']=br[-1]['date'] if br else item['latest_date']
             except Exception: pass
-        try:item['quote_ok']=eastmoney_quote(code).get('price') is not None
-        except Exception: pass
+        for qfn in (eastmoney_quote,tencent_index_quote):
+            try:
+                q=qfn(code)
+                if q and q.get('price') is not None:
+                    item['quote_ok']=True; item['quote_source']=q.get('source'); item['quote']=q; break
+            except Exception: pass
         fresh=False
         if item['latest_date']:
             try:fresh=(today-dt.date.fromisoformat(item['latest_date'])).days<=7
