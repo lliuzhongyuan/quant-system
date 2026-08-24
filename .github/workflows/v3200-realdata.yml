@@ -1,0 +1,32 @@
+name: V3200 Real Data Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3200-gemini-realdata-integration]
+
+permissions:
+  contents: write
+
+jobs:
+  source-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Syntax check
+        run: python -m compileall -q engine scripts
+      - name: Real source probe
+        run: python scripts/v3200_realdata_probe.py
+      - name: Upload acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3200-realdata-acceptance
+          path: data/v3200_realdata_probe.json
+          if-no-files-found: warn
