@@ -19,27 +19,15 @@ engine.fetch_kline = robust_kline
 engine.fetch_indices = fetch_indices
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 
-def load_valid_universe_snapshot():
-    p=Path('data/universe_stats.json')
-    if p.exists():
-        try:
-            x=json.loads(p.read_text(encoding='utf8'))
-            n=int(x.get('tradable_universe_count') or 0)
-            if n>=3000:
-                return x
-        except Exception:
-            pass
-    return run_universe_snapshot()
-
 def load_verified_market():
-    """Use the exact market snapshot produced by the preflight universe step."""
+    """Use the exact market snapshot produced by the immediately preceding universe refresh."""
     p=Path('data/universe_market.json')
-    if not p.exists():
-        raise SystemExit('BLOCKED: verified universe market snapshot is missing')
+    if not p.exists(): raise SystemExit('BLOCKED: verified universe market snapshot is missing')
     try:
         obj=json.loads(p.read_text(encoding='utf8'))
         items=obj.get('items') or []
-        if int(obj.get('tradable_universe_count') or 0) < 3000 or len(items) < 3000:
+        n=int(obj.get('tradable_universe_count') or 0)
+        if n<3000 or len(items)<3000:
             raise ValueError('verified universe market snapshot is incomplete')
     except Exception as e:
         raise SystemExit(f'BLOCKED: invalid verified universe market snapshot: {type(e).__name__}')
@@ -68,7 +56,13 @@ def load_verified_market():
     return out
 
 def production():
-    universe = load_valid_universe_snapshot()
+    # V3200 rule: never trust a previously generated universe file as today's live universe.
+    # Always make a fresh acquisition attempt; universe_snapshot itself may use a verified
+    # recent snapshot only as a controlled recovery path when the fresh provider is incomplete.
+    universe = run_universe_snapshot()
+    if int(universe.get('tradable_universe_count') or 0) < 3000:
+        raise SystemExit('BLOCKED: refreshed universe did not meet minimum coverage')
+
     probe_path = Path('data/provider_health.json')
     if not probe_path.exists(): raise SystemExit('BLOCKED: provider preflight result is missing')
     try:
@@ -91,7 +85,6 @@ def production():
         raise SystemExit(f'BLOCKED: verified index snapshot incomplete: {sorted(actual)}')
     if any(x.get('price') is None or x.get('change_pct') is None or x.get('kline_rows',0) < 60 for x in verified_indices):
         raise SystemExit('BLOCKED: verified index snapshot contains incomplete quote/K-line data')
-    # Freeze the exact four-index snapshot for this production run.
     engine.fetch_indices=lambda: verified_indices
 
     verified_market=load_verified_market()
@@ -103,12 +96,12 @@ def production():
     market_path=Path('data/market.json')
     if market_path.exists():
         market_obj=json.loads(market_path.read_text(encoding='utf8'))
-        market_obj.update({'universe_raw': universe.get('raw_count', 0),'universe_unique': universe.get('unique_count', 0),'universe_valid_codes': universe.get('valid_code_count', 0),'tradable_universe': universe.get('tradable_universe_count', 0),'universe_excluded': universe.get('excluded', {}),'coverage_denominator': universe.get('tradable_universe_count', 0),'coverage_definition': 'scanned / dynamic tradable universe','verified_index_snapshot':verified_indices})
+        market_obj.update({'universe_raw': universe.get('raw_count', 0),'universe_unique': universe.get('unique_count', 0),'universe_valid_codes': universe.get('valid_code_count', 0),'tradable_universe': universe.get('tradable_universe_count', 0),'universe_excluded': universe.get('excluded', {}),'coverage_denominator': universe.get('tradable_universe_count', 0),'coverage_definition': 'scanned / dynamic tradable universe','verified_index_snapshot':verified_indices,'universe_fallback_used':bool(universe.get('fallback_used',False))})
         market_path.write_text(json.dumps(market_obj,ensure_ascii=False,separators=(',',':')),encoding='utf8')
     signals_path=Path('data/signals.json')
     if signals_path.exists():
         signals_obj=json.loads(signals_path.read_text(encoding='utf8'))
-        signals_obj.update({'universe_raw': universe.get('raw_count', 0),'universe_unique': universe.get('unique_count', 0),'tradable_universe': universe.get('tradable_universe_count', 0),'coverage_denominator': universe.get('tradable_universe_count', 0)})
+        signals_obj.update({'universe_raw': universe.get('raw_count', 0),'universe_unique': universe.get('unique_count', 0),'tradable_universe': universe.get('tradable_universe_count', 0),'coverage_denominator': universe.get('tradable_universe_count', 0),'universe_fallback_used':bool(universe.get('fallback_used',False))})
         signals_path.write_text(json.dumps(signals_obj,ensure_ascii=False,separators=(',',':')),encoding='utf8')
 
     validate(True)
