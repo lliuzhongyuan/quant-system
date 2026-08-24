@@ -1,5 +1,13 @@
 name: V3200 Real Data Acceptance
 on:
+  push:
+    branches: [v3200-gemini-realdata-integration]
+    paths:
+      - 'engine/**'
+      - 'scripts/data_sources.py'
+      - 'scripts/v3200_realdata_probe.py'
+      - 'requirements.txt'
+      - '.github/workflows/v3200-realdata-probe.yml'
   workflow_dispatch:
 permissions:
   contents: write
