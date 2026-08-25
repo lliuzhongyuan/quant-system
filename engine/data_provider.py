@@ -2,14 +2,14 @@
 """V3200 real-data provider: no synthetic market values."""
 import os, re, time, logging
 from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import requests
 
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import sys
 if ROOT not in sys.path: sys.path.insert(0, ROOT)
-from scripts.data_sources import robust_kline, tencent_quote, eastmoney_kline, baostock_kline
+from scripts.data_sources import tencent_quote, eastmoney_kline, baostock_kline
+from engine.batch_data import load_real_klines
 
 UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151 Safari/537.36'
 SINA='https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData'
@@ -26,7 +26,7 @@ class SectorQuote:
 class DataProvider:
     def __init__(self, cache_dir='data/cache'):
         os.makedirs(cache_dir,exist_ok=True)
-        self.provider_health={'status':'REAL_DATA_ONLY','universe':'LIVE_SINA','kline':['Baostock','Eastmoney','Tencent','Sina','Yahoo'],'index_realtime':'Tencent+KlineFallback','fundamentals':'UNAVAILABLE_NOT_SYNTHETIC','sector':'Eastmoney_Best_Effort'}
+        self.provider_health={'status':'REAL_DATA_ONLY','universe':'LIVE_SINA','kline':['Yahoo batch','Eastmoney','Tencent','Sina','Baostock','verified cache recovery'],'index_realtime':'Tencent+KlineFallback','fundamentals':'UNAVAILABLE_NOT_SYNTHETIC','sector':'Eastmoney_Best_Effort'}
 
     def _s(self):
         s=requests.Session(); s.headers.update({'User-Agent':UA,'Accept':'application/json,text/plain,*/*','Referer':'https://finance.sina.com.cn/'}); return s
@@ -48,25 +48,24 @@ class DataProvider:
         return [(str(x.get('code')),str(x.get('name') or ''),x) for x in {str(x.get('code')):x for x in raw if re.fullmatch(r'\d{6}',str(x.get('code','')))}.values() if not str(x.get('code')).startswith(('68','8','4')) and 'ST' not in str(x.get('name','')).upper() and '退' not in str(x.get('name','')) and '停牌' not in str(x.get('name',''))]
 
     def load_universe_snapshot(self):
-        items=self._universe()
-        def fetch(item):
-            code,name,meta=item; rows=robust_kline(code,180)
-            if len(rows)<60:return None
-            d=pd.DataFrame(rows); d['code']=code; d['name']=name; d['board']='创业板' if code.startswith('30') else '主板'; d['sector']='未分类（实时数据层）'; d['bars_count']=len(d)
-            d['turnover_rate']=pd.to_numeric(meta.get('turnover'),errors='coerce')
-            d['volume_ratio']=(d['volume']/d['volume'].rolling(5).mean()).fillna(1.0)
-            for c in ('float_mv','pe','pb','roe','profit_growth','eps','deduct_net_profit'): d[c]=pd.NA
-            d['is_leader']=False; d['data_quality']='REAL_KLINE_NO_FUNDAMENTALS'; return d
+        """Build the production dataset in bounded batches.
+        No per-symbol robust-provider waterfall is used here; this prevents a slow provider
+        from multiplying latency by 4400 symbols. Missing symbols are recorded, not fabricated.
+        """
+        items=self._universe(); codes=[x[0] for x in items]; meta={x[0]:x for x in items}
+        klines,diag=load_real_klines(codes)
+        log.info('batch real-data diagnostics: %s',diag)
         out=[]
-        with ThreadPoolExecutor(max_workers=24) as ex:
-            fs=[ex.submit(fetch,x) for x in items]
-            for f in as_completed(fs):
-                try:
-                    v=f.result()
-                    if v is not None: out.append(v)
-                except Exception: pass
+        for code,rows in klines.items():
+            if len(rows)<60 or code not in meta: continue
+            _,name,m=meta[code]; d=pd.DataFrame(rows); d['code']=code; d['name']=name; d['board']='创业板' if code.startswith('30') else '主板'; d['sector']='未分类（实时数据层）'; d['bars_count']=len(d)
+            d['turnover_rate']=pd.to_numeric(m.get('turnover'),errors='coerce'); d['volume_ratio']=(d['volume']/d['volume'].rolling(5).mean()).fillna(1.0)
+            for c in ('float_mv','pe','pb','roe','profit_growth','eps','deduct_net_profit'): d[c]=pd.NA
+            d['is_leader']=False; d['data_quality']='REAL_KLINE_NO_FUNDAMENTALS'; out.append(d)
         if not out: raise RuntimeError('BLOCKED: no real K-line data returned')
-        return pd.concat(out,ignore_index=True)
+        result=pd.concat(out,ignore_index=True)
+        self.last_batch_diagnostics=diag
+        return result
 
     def _idx(self,code,name,prefix):
         try:
