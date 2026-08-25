@@ -1,10 +1,14 @@
 import sys, json, math
 from pathlib import Path
-sys.path.insert(0,str(Path(__file__).resolve().parent))
-import engine
+
+ROOT=Path(__file__).resolve().parents[1]
+SCRIPTS=ROOT/'scripts'
+sys.path.insert(0,str(ROOT))
+sys.path.insert(1,str(SCRIPTS))
+
+import scripts.engine as legacy_engine
 from data_sources import robust_kline
 from index_sources import fetch_indices
-from engine import update_news
 from backtest import run as run_backtest
 from data_quality import validate
 from strategy_board import run as run_strategy_board
@@ -15,7 +19,10 @@ from sector_engine import run as run_sector
 from news_aggregator import run as run_news_aggregator
 from universe_snapshot import run as run_universe_snapshot
 from engine.batch_scan import run as run_batch_scan
-engine.fetch_kline=robust_kline; engine.fetch_indices=fetch_indices
+
+legacy_engine.fetch_kline=robust_kline
+legacy_engine.fetch_indices=fetch_indices
+update_news=legacy_engine.update_news
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 def read_json(path): return json.loads(Path(path).read_text(encoding='utf8'))
 def build_universe_once():
@@ -54,7 +61,6 @@ def production():
  if actual!=expected or len(verified_indices)!=4 or any(x.get('price') is None or x.get('change_pct') is None or x.get('kline_rows',0)<60 for x in verified_indices): raise SystemExit('BLOCKED: verified index snapshot incomplete')
  verified_market=load_verified_market()
  if len(verified_market)<int(universe.get('tradable_universe_count') or 0)*.9: raise SystemExit(f"BLOCKED: verified market snapshot coverage too low: {len(verified_market)}/{universe.get('tradable_universe_count')}")
- engine.fetch_market=lambda: verified_market; engine.fetch_indices=lambda: verified_indices
  run_batch_scan(verified_market,verified_indices)
  mp=Path('data/market.json')
  if mp.exists():
