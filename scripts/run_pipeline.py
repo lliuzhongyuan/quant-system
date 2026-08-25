@@ -4,7 +4,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 import engine
 from data_sources import robust_kline
 from index_sources import fetch_indices
-from engine import scan_all, update_news
+from engine import update_news
 from backtest import run as run_backtest
 from data_quality import validate
 from strategy_board import run as run_strategy_board
@@ -14,6 +14,7 @@ from walkforward import run as run_walkforward
 from sector_engine import run as run_sector
 from news_aggregator import run as run_news_aggregator
 from universe_snapshot import run as run_universe_snapshot
+from engine.batch_scan import run as run_batch_scan
 
 engine.fetch_kline = robust_kline
 engine.fetch_indices = fetch_indices
@@ -22,7 +23,6 @@ mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 def read_json(path): return json.loads(Path(path).read_text(encoding='utf8'))
 
 def build_universe_once():
-    # One acquisition per production run. Reuse only the same-run preflight snapshot.
     p=Path('data/universe_stats.json')
     if not p.exists() or not Path('data/universe_market.json').exists():
         x=run_universe_snapshot()
@@ -39,7 +39,7 @@ def load_verified_market():
     if n<3000 or len(items)<n*.95: raise SystemExit(f'BLOCKED: verified universe incomplete: {len(items)}/{n}')
     def num(x,default=None):
         try:
-            v=float(x); return default if math.isnan(v) else v
+            v=float(x); return default if math.isnan(x) else v
         except Exception:return default
     def exchange(code): return 'sh' if str(code).startswith(('5','6','9')) else 'sz'
     out=[]
@@ -62,9 +62,9 @@ def production():
     if actual!=expected or len(verified_indices)!=4 or any(x.get('price') is None or x.get('change_pct') is None or x.get('kline_rows',0)<60 for x in verified_indices): raise SystemExit('BLOCKED: verified index snapshot incomplete')
     verified_market=load_verified_market()
     if len(verified_market)<int(universe.get('tradable_universe_count') or 0)*.9: raise SystemExit(f"BLOCKED: verified market snapshot coverage too low: {len(verified_market)}/{universe.get('tradable_universe_count')}")
-    # Freeze both snapshots: scan_all cannot call the universe/index providers again.
     engine.fetch_market=lambda: verified_market; engine.fetch_indices=lambda: verified_indices
-    scan_all()
+    # V3200.2: batch all real K-lines first, then calculate A-H locally. No per-stock provider waterfall in production.
+    run_batch_scan(verified_market,verified_indices)
     mp=Path('data/market.json')
     if mp.exists():
         o=read_json(mp); o.update({'universe_raw':universe.get('raw_count',0),'universe_unique':universe.get('unique_count',0),'universe_valid_codes':universe.get('valid_code_count',0),'tradable_universe':universe.get('tradable_universe_count',0),'universe_excluded':universe.get('excluded',{}),'coverage_denominator':universe.get('tradable_universe_count',0),'coverage_definition':'scanned / dynamic tradable universe','verified_index_snapshot':verified_indices,'universe_snapshot_frozen':True,'universe_fallback_used':bool(universe.get('fallback_used',False))}); mp.write_text(json.dumps(o,ensure_ascii=False,separators=(',',':')),encoding='utf8')
