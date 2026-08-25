@@ -9,6 +9,10 @@ on:
       - 'scripts/universe_snapshot.py'
       - 'scripts/index_sources.py'
       - 'scripts/index_probe.py'
+      - 'engine/batch_data.py'
+      - 'engine/batch_scan.py'
+      - 'engine/data_provider.py'
+      - '.github/workflows/daily-scan.yml'
   schedule:
     - cron: '50 0 * * 1-5'
     - cron: '20 7 * * 1-5'
@@ -17,13 +21,17 @@ permissions:
   contents: write
 concurrency:
   group: quant-daily-scan
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Report build commit
+        run: |
+          echo "commit=$(git rev-parse HEAD)"
+          git log -1 --pretty='format:subject=%s'
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: pip install -r requirements.txt
