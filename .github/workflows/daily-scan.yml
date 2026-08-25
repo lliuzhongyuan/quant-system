@@ -2,6 +2,7 @@ name: 每日全市场量化扫描
 on:
   push:
     paths:
+      - '.github/workflows/daily-scan.yml'
       - 'scripts/data_sources.py'
       - 'scripts/engine.py'
       - 'scripts/run_pipeline.py'
@@ -24,6 +25,8 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+      - name: Report build commit
+        run: git log -1 --format='commit=%H%nsubject=%s'
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: pip install -r requirements.txt
