@@ -1,16 +1,8 @@
 import sys, json, math
 from pathlib import Path
-
-ROOT=Path(__file__).resolve().parents[1]
-SCRIPTS=ROOT/'scripts'
-# When Python executes scripts/run_pipeline.py, sys.path[0] is scripts/.
-# Remove it before importing the real top-level engine package; otherwise
-# scripts/engine.py shadows engine/ and breaks engine.batch_scan imports.
-while str(SCRIPTS) in sys.path:
-    sys.path.remove(str(SCRIPTS))
-sys.path.insert(0,str(ROOT))
-sys.path.insert(1,str(SCRIPTS))
-
+ROOT=Path(__file__).resolve().parents[1]; SCRIPTS=ROOT/'scripts'
+while str(SCRIPTS) in sys.path: sys.path.remove(str(SCRIPTS))
+sys.path.insert(0,str(ROOT)); sys.path.insert(1,str(SCRIPTS))
 import scripts.engine as legacy_engine
 from data_sources import robust_kline
 from index_sources import fetch_indices
@@ -23,11 +15,8 @@ from walkforward import run as run_walkforward
 from sector_engine import run as run_sector
 from news_aggregator import run as run_news_aggregator
 from universe_snapshot import run as run_universe_snapshot
-from engine.batch_scan import run as run_batch_scan
-
-legacy_engine.fetch_kline=robust_kline
-legacy_engine.fetch_indices=fetch_indices
-update_news=legacy_engine.update_news
+from v3200_batch_scan import run as run_batch_scan
+legacy_engine.fetch_kline=robust_kline; legacy_engine.fetch_indices=fetch_indices; update_news=legacy_engine.update_news
 mode=sys.argv[1] if len(sys.argv)>1 else 'daily'
 def read_json(path): return json.loads(Path(path).read_text(encoding='utf8'))
 def build_universe_once():
@@ -56,20 +45,18 @@ def load_verified_market():
  if len(out)<n*.95: raise SystemExit(f'BLOCKED: verified universe conversion incomplete: {len(out)}/{n}')
  return out
 def production():
- universe=build_universe_once()
- payload=read_json('data/provider_health.json') if Path('data/provider_health.json').exists() else {}
- probe=payload.get('provider_health') or {}; healthy=int(payload.get('healthy_providers') or sum(1 for v in probe.values() if v.get('ok')))
+ universe=build_universe_once(); payload=read_json('data/provider_health.json') if Path('data/provider_health.json').exists() else {}; probe=payload.get('provider_health') or {}; healthy=int(payload.get('healthy_providers') or sum(1 for v in probe.values() if v.get('ok')))
  if payload.get('status')!='PASS' or healthy<1: raise SystemExit('BLOCKED: provider preflight did not pass')
  index_health=read_json('data/index_provider_health.json') if Path('data/index_provider_health.json').exists() else {}
  if index_health.get('status')!='PASS' or int(index_health.get('healthy') or 0)<4: raise SystemExit('BLOCKED: index provider preflight did not pass all 4 major indexes')
  verified_indices=fetch_indices(); expected={'sh000001','sz399001','sz399006','sh000300'}; actual={str(x.get('code')) for x in verified_indices if x.get('code')}
  if actual!=expected or len(verified_indices)!=4 or any(x.get('price') is None or x.get('change_pct') is None or x.get('kline_rows',0)<60 for x in verified_indices): raise SystemExit('BLOCKED: verified index snapshot incomplete')
  verified_market=load_verified_market()
- if len(verified_market)<int(universe.get('tradable_universe_count') or 0)*.9: raise SystemExit(f"BLOCKED: verified market snapshot coverage too low: {len(verified_market)}/{universe.get('tradable_universe_count')}")
+ if len(verified_market)<int(universe.get('tradable_universe_count') or 0)*.9: raise SystemExit(f'BLOCKED: verified market snapshot coverage too low: {len(verified_market)}/{universe.get("tradable_universe_count")}')
  run_batch_scan(verified_market,verified_indices)
  mp=Path('data/market.json')
  if mp.exists():
-  o=read_json(mp); o.update({'universe_raw':universe.get('raw_count',0),'universe_unique':universe.get('unique_count',0),'universe_valid_codes':universe.get('valid_code_count',0),'tradable_universe':universe.get('tradable_universe_count',0),'universe_excluded':universe.get('excluded',{}),'coverage_denominator':universe.get('tradable_universe_count',0),'coverage_definition':'scanned / dynamic tradable universe','verified_index_snapshot':verified_indices,'universe_snapshot_frozen':True,'universe_fallback_used':bool(universe.get('fallback_used',False))}); mp.write_text(json.dumps(o,ensure_ascii=False,separators=(',',':')),encoding='utf8')
+  o=read_json(mp); o.update({'universe_raw':universe.get('raw_count',0),'universe_unique':universe.get('unique_count',0),'universe_valid_codes':universe.get('valid_code_count',0),'tradable_universe':universe.get('tradable_universe_count',0),'universe_excluded':universe.get('excluded',{}),'coverage_denominator':universe.get('tradable_universe_count',0),'coverage_definition':'real K-line scanned / dynamic tradable universe','verified_index_snapshot':verified_indices,'universe_snapshot_frozen':True,'universe_fallback_used':bool(universe.get('fallback_used',False))}); mp.write_text(json.dumps(o,ensure_ascii=False,separators=(',',':')),encoding='utf8')
  sp=Path('data/signals.json')
  if sp.exists():
   o=read_json(sp); o.update({'universe_raw':universe.get('raw_count',0),'universe_unique':universe.get('unique_count',0),'tradable_universe':universe.get('tradable_universe_count',0),'coverage_denominator':universe.get('tradable_universe_count',0),'universe_snapshot_frozen':True,'universe_fallback_used':bool(universe.get('fallback_used',False))}); sp.write_text(json.dumps(o,ensure_ascii=False,separators=(',',':')),encoding='utf8')
