@@ -5,10 +5,13 @@ on:
       - 'scripts/data_sources.py'
       - 'scripts/engine.py'
       - 'scripts/run_pipeline.py'
+      - 'scripts/v3200_batch_scan.py'
       - 'scripts/provider_probe.py'
       - 'scripts/universe_snapshot.py'
       - 'scripts/index_sources.py'
       - 'scripts/index_probe.py'
+      - 'scripts/data_quality.py'
+      - 'engine/__init__.py'
       - 'engine/batch_data.py'
       - 'engine/batch_scan.py'
       - 'engine/data_provider.py'
@@ -30,8 +33,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Report build commit
         run: |
-          echo "commit=$(git rev-parse HEAD)"
+          echo "github_sha=${GITHUB_SHA}"
+          echo "head=$(git rev-parse HEAD)"
           git log -1 --pretty='format:subject=%s'
+          test "${GITHUB_SHA}" = "$(git rev-parse HEAD)"
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: pip install -r requirements.txt
