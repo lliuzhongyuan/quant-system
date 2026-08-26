@@ -3,6 +3,11 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 SCRIPTS=ROOT/'scripts'
+# When Python executes scripts/run_pipeline.py, sys.path[0] is scripts/.
+# Remove it before importing the real top-level engine package; otherwise
+# scripts/engine.py shadows engine/ and breaks engine.batch_scan imports.
+while str(SCRIPTS) in sys.path:
+    sys.path.remove(str(SCRIPTS))
 sys.path.insert(0,str(ROOT))
 sys.path.insert(1,str(SCRIPTS))
 
