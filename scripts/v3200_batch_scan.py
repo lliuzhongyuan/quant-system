@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-"""V3200.4 production scanner: bounded real-data acquisition + quality gate.
+"""V3200.5 production scanner: bounded real-data acquisition + quality gate.
 
 Production never creates synthetic K-lines. Providers are isolated so a slow or
 broken source cannot hold the whole market scan indefinitely.
 """
 import datetime as dt
 import json
+import multiprocessing as mp
 import time
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from pathlib import Path
@@ -37,8 +38,62 @@ def _fresh(rows):
         return False
 
 
+def _baostock_process_worker(codes, queue):
+    """One OS process owns one Baostock session; process can be killed on timeout."""
+    out = {}
+    for code in codes:
+        try:
+            rows = baostock_kline(code, 180)
+            if len(rows) >= MIN_ROWS and _fresh(rows):
+                out[str(code)] = rows[-180:]
+        except Exception:
+            continue
+    try:
+        queue.put(out)
+    except Exception:
+        pass
+
+
+def _baostock_process_fetch(codes, workers, deadline):
+    """Hard-bounded Baostock acquisition using killable OS processes."""
+    codes = list(dict.fromkeys(str(c) for c in codes))
+    if not codes:
+        return {}
+    ctx = mp.get_context('spawn')
+    queue = ctx.Queue()
+    chunks = [codes[i::workers] for i in range(workers) if codes[i::workers]]
+    processes = [ctx.Process(target=_baostock_process_worker, args=(chunk, queue)) for chunk in chunks]
+    started = time.monotonic()
+    for p in processes:
+        p.daemon = True
+        p.start()
+    out = {}
+    try:
+        while time.monotonic() - started < deadline:
+            if all(not p.is_alive() for p in processes):
+                break
+            try:
+                part = queue.get(timeout=2)
+                if isinstance(part, dict):
+                    out.update(part)
+            except Exception:
+                pass
+    finally:
+        for p in processes:
+            if p.is_alive():
+                p.terminate()
+        for p in processes:
+            p.join(timeout=5)
+        try:
+            queue.close()
+            queue.join_thread()
+        except Exception:
+            pass
+    return out
+
+
 def _bounded_fetch(codes, fn, workers, deadline):
-    """Bounded fan-out. Returns whatever completed before the provider deadline."""
+    """Bounded HTTP fan-out. Returns whatever completed before the provider deadline."""
     codes = list(dict.fromkeys(str(c) for c in codes))
     if not codes:
         return {}
@@ -52,11 +107,7 @@ def _bounded_fetch(codes, fn, workers, deadline):
             remaining = end_at - time.monotonic()
             if remaining <= 0:
                 break
-            done, pending = wait(
-                pending,
-                timeout=min(5.0, remaining),
-                return_when=FIRST_COMPLETED,
-            )
+            done, pending = wait(pending, timeout=min(5.0, remaining), return_when=FIRST_COMPLETED)
             for future in done:
                 code = futures[future]
                 try:
@@ -68,10 +119,8 @@ def _bounded_fetch(codes, fn, workers, deadline):
     finally:
         for future in pending:
             future.cancel()
-        # Do not wait for a hung provider during shutdown.
         executor.shutdown(wait=False, cancel_futures=True)
     return out
-
 
 def _provider_round(codes, name, fn, workers, deadline):
     started = time.monotonic()
@@ -104,13 +153,25 @@ def load_real_klines_v3200(codes):
         'missing': 0,
     }
 
-    # Verified primary: Baostock, tightly bounded.
+    # Primary: Eastmoney is attempted first because the latest preflight passed it.
     missing = [c for c in codes if c not in result]
-    got, info = _provider_round(missing, 'Baostock', baostock_kline, BAOSTOCK_WORKERS, BAOSTOCK_DEADLINE_SECONDS)
+    got, info = _provider_round(missing, 'Eastmoney', eastmoney_kline, HTTP_WORKERS, HTTP_DEADLINE_SECONDS)
     result.update(got)
-    diagnostics['providers'].append({**info, 'workers': BAOSTOCK_WORKERS, 'deadline_seconds': BAOSTOCK_DEADLINE_SECONDS})
+    diagnostics['providers'].append({**info, 'workers': HTTP_WORKERS, 'deadline_seconds': HTTP_DEADLINE_SECONDS})
 
-    # HTTP sources are independent bounded fallback rounds. They are deliberately
+    # Baostock fallback is isolated in killable OS processes, not threads.
+    missing = [c for c in codes if c not in result]
+    started = time.monotonic()
+    got = _baostock_process_fetch(missing, BAOSTOCK_WORKERS, BAOSTOCK_DEADLINE_SECONDS)
+    result.update(got)
+    diagnostics['providers'].append({
+        'provider': 'Baostock', 'requested': len(missing), 'success': len(got),
+        'elapsed_seconds': round(time.monotonic() - started, 2),
+        'fresh_max_age_days': FRESH_MAX_AGE_DAYS, 'workers': BAOSTOCK_WORKERS,
+        'deadline_seconds': BAOSTOCK_DEADLINE_SECONDS, 'isolation': 'process'
+    })
+
+    # Remaining HTTP sources are independent bounded fallback rounds. They are deliberately
     # not run as an unbounded 4400-request waterfall.
     for name, fn in (
         ('Eastmoney', eastmoney_kline),
@@ -217,7 +278,7 @@ def run(verified_market, verified_indices):
         'kline_coverage': round(data_coverage, 4),
         'signal_coverage': round(signal_coverage, 4),
         'indices': verified_indices,
-        'data_quality': 'REAL_KLINE_BATCH_V3200_4',
+        'data_quality': 'REAL_KLINE_BATCH_V3200_5',
         'batch_diagnostics': diag,
         'invalid_kline_rows': invalid,
         'elapsed_seconds': elapsed,
@@ -238,7 +299,7 @@ def run(verified_market, verified_indices):
         'batch_diagnostics': diag,
         'invalid_kline_rows': invalid,
         'elapsed_seconds': elapsed,
-        'data_quality': 'technical_real_batch_v3200_4',
+        'data_quality': 'technical_real_batch_v3200_5',
     }
     (DATA / 'market.json').write_text(json.dumps(market, ensure_ascii=False, separators=(',', ':')), encoding='utf8')
     (DATA / 'signals.json').write_text(json.dumps(payload, ensure_ascii=False, separators=(',', ':')), encoding='utf8')
