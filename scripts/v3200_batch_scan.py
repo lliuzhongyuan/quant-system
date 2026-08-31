@@ -174,7 +174,6 @@ def load_real_klines_v3200(codes):
     # Remaining HTTP sources are independent bounded fallback rounds. They are deliberately
     # not run as an unbounded 4400-request waterfall.
     for name, fn in (
-        ('Eastmoney', eastmoney_kline),
         ('Tencent', tencent_kline),
         ('Sina', sina_kline),
         ('Yahoo', yahoo_kline),
